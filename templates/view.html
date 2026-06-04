@@ -17,7 +17,9 @@
     <header class="navbar navbar-dark bg-dark px-3">
         <span class="navbar-brand mb-0 h1 text-truncate">Viewing {{ filename }}</span>
         <div class="d-flex gap-2">
-            <a class="btn btn-outline-light btn-sm" href="{{ url_for('edit_file', rel_path=filename) }}">Edit Source</a>
+            {% if diagram_id is defined %}
+                <a class="btn btn-outline-light btn-sm" href="{{ url_for('edit_file', diagram_id=diagram_id) }}">Edit in Canvas</a>
+            {% endif %}
             <a class="btn btn-warning btn-sm" href="{{ url_for('repository') }}">Repository</a>
         </div>
     </header>
