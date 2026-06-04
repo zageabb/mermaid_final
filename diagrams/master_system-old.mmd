@@ -1,0 +1,29 @@
+flowchart TB
+    %% Master connections between sub-systems
+    ClientApp --> API_Gateway
+    API_Gateway --> UserDB
+    PaymentProcessor --> PaymentDB
+
+    %% Sub-diagram 1
+    subgraph ClientApp [Client Application UI]
+        Mobile[Mobile App]
+        Web[Web Dashboard]
+    end
+
+    %% Sub-diagram 2
+    subgraph API_Gateway [API Gateway & Routing]
+        Auth[Authentication Service]
+        Router[Traffic Router]
+        Auth --> Router
+    end
+
+    %% Sub-diagram 3
+    subgraph PaymentProcessor [Payment Microservice]
+        StripeAPI[Stripe Integration]
+        Receipts[Receipt Generator]
+        StripeAPI --> Receipts
+    end
+
+    %% Joins BETWEEN sub-diagrams (Internal nodes connecting)
+    Web --> Auth
+    Router --> StripeAPI

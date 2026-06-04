@@ -1,0 +1,5 @@
+subgraph PaymentProcessor [Payment Microservice]
+    StripeAPI[Stripe Integration]
+    Receipts[Receipt Generator]
+    StripeAPI --> Receipts
+end

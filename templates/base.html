@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Final</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body { height: 100%; }
+        body { background: #f5f7fb; color: #1f2937; }
+        .navbar { min-height: 56px; }
+        .app-shell { min-height: calc(100vh - 56px); }
+        .canvas-frame { width: 100%; height: calc(100vh - 105px); border: 0; background: white; }
+        .table-fixed { table-layout: fixed; }
+        .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; }
+        .child-file td:first-child { padding-left: 2rem; }
+        .toolbar { gap: .5rem; }
+        .diagram-stage { height: calc(100vh - 57px); background: #fbfcfe; overflow: hidden; }
+        .code-editor { min-height: 60vh; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-3">
+        <a class="navbar-brand fw-semibold" href="{{ url_for('canvas') }}">Mermaid Final</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('canvas') }}">Canvas</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('library') }}">Saved Library</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('repository') }}">File Repository</a></li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Quick Launch ({{ saved_links|length }})</a>
+                    <ul class="dropdown-menu" style="max-height: 400px; overflow-y: auto; min-width: 280px;">
+                        {% for link in saved_links %}
+                            <li><a class="dropdown-item text-truncate" href="{{ url_for('canvas', url=link.url, name=link.description) }}">{{ link.description }}</a></li>
+                        {% else %}
+                            <li><span class="dropdown-item text-muted">No saved diagrams</span></li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            </ul>
+            <span class="navbar-text small text-light-emphasis">Editor: {{ editor_url }}</span>
+        </div>
+    </nav>
+
+    <main class="app-shell">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="container-fluid pt-3">
+                    {% for message in messages %}
+                        <div class="alert alert-info mb-2">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

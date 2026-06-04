@@ -1,0 +1,113 @@
+erDiagram
+    %% ==========================================================
+    %% DYNAMIC SYSTEM INCLUDES (IN-MEMORY MODULE ASSEMBLY)
+    %% ==========================================================
+    %% INCLUDE sub_diagrams/global_metadata.mmd
+    %% INCLUDE sub_diagrams/materials_management.mmd
+    %% INCLUDE sub_diagrams/sales_distribution.mmd
+    %% INCLUDE sub_diagrams/finance_controlling.mmd
+    %% INCLUDE sub_diagrams/project_systems.mmd
+    %% INCLUDE sub_diagrams/quality_management.mmd
+
+    %% ==========================================================
+    %% INTER-MODULE HOOKS & FOREIGN KEY RELATIONSHIPS
+    %% ==========================================================
+    
+    %% Global Parameters vs Functional Modules Mapping
+    T001W ||--o{ EBAN : "validates plant configuration"
+    T001W ||--o{ EKPO : "validates plant configuration"
+    T001W ||--o{ MSEG : "validates plant configuration"
+    T001W ||--o{ VBAP : "validates plant configuration"
+    T001W ||--o{ PROJ : "validates plant configuration"
+    T001W ||--o{ PRPS : "validates plant configuration"
+    T001W ||--o{ AUFK : "validates plant configuration"
+    T001W ||--o{ QALS : "validates plant configuration"
+    T001W ||--o{ QFMN : "validates plant configuration"
+    T052 ||--o{ EKKO : "defines payment terms"
+    LFA1 ||--o{ ADR6 : "resolves vendor addresses via ADRNR"
+
+    %% Material & Vendor Master Dimensions vs Document Flows
+    MARA ||--o{ EBAN : "categorizes requisition lines"
+    MARA ||--o{ EKPO : "categorizes purchasing lines"
+    MARA ||--o{ MSEG : "categorizes inventory lines"
+    MARA ||--o{ VBAP : "categorizes order lines"
+    MARA ||--o{ LIPS : "categorizes delivery lines"
+    MARA ||--o{ VBRP : "categorizes billing lines"
+    MARA ||--o{ QALS : "defines inspection lot scope"
+    MARA ||--o{ QFMN : "tracks failures against item code"
+    LFA1 ||--o{ EKKO : "links vendor profile metadata"
+    LFA1 ||--o{ BSEG : "reconciliation lookup accounts"
+    LFA1 ||--o{ ACDOCA : "reconciliation lookup accounts"
+    LFA1 ||--o{ OPT_VIM_1HEAD : "matches invoiced supplier"
+
+    %% Procurement (MM) vs Controlling & OpenText VIM Hooks
+    EKKO ||--o{ OPT_VIM_1HEAD : "verifies against PO verification metrics"
+    BKPF ||--o{ OPT_VIM_1HEAD : "matches out to follow-on FI documents"
+    CEPCT ||--o{ AUFK : "links tracking segments via PRCTR"
+
+    %% Project Systems (PS) Cost Assignment to Finance Core Ledger
+    PRPS ||--o{ ACDOCA : "tracks costs against nodes via PS_PSP_PNR"
+
+    %% Quality Management (QM) Pipeline Evaluation Triggers
+    MSEG ||--o{ QALS : "triggers lots from stock movements"
+    EKPO ||--o{ QALS : "triggers lot rules during receipts"
+    AUFK ||--o{ QALS : "associates lots to process operations"
+    AUFK ||--o{ QFMN : "tracks failures against running works"
+
+    %% ==========================================================
+    %% VISUAL MODULE COLOR BOUNDARIES (INLINE ER STYLING)
+    %% ==========================================================
+    
+    %% Global Metadata Modules (Blue Theme)
+    style T001W fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style T006A fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style TJ30T fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style ADR6 fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style T052 fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+
+    %% Materials Management (Green Theme)
+    style LFA1 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style MARA fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style MAKT fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EBAN fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EKKO fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EKPO fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EKBE fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EKET fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EKES fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style MKPF fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style MSEG fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
+    %% Sales & Distribution (Orange Theme)
+    style VBAK fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style VBAP fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style LIKP fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style LIPS fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style VBRK fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style VBRP fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style TVKOT fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style TVAPT fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+
+    %% Finance & Controlling (Pink Theme)
+    style BKPF fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style BSEG fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style ACDOCA fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style SKB1 fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style SKAT fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style CSKT fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style CEPCT fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    style OPT_VIM_1HEAD fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    %% Project Systems (Purple Theme)
+    style PROJ fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style PRPS fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style PRPM fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style AUFK fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style AFVC fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+
+    %% Quality Management (Brown Theme)
+    style QALS fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    style QAMV fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    style QASE fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    style QFMN fill:#efebe9,stroke:#5d4037,stroke-width:2px
+    style TQ30T fill:#efebe9,stroke:#5d4037,stroke-width:2px

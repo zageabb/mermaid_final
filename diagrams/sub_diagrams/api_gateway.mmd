@@ -1,0 +1,6 @@
+subgraph API_Gateway [API Gateway & Routing]
+    Auth[Authentication Service]
+    Router[Traffic Router]
+    Auth --> Router
+    Router --> Gerald
+end

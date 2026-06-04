@@ -1,0 +1,65 @@
+erDiagram
+    BKPF {
+        string BUKRS PK "Company Code"
+        string BELNR PK "FI Document Number"
+        string GJAHR PK "Fiscal Year"
+        string AWKEY "Object Reference Key"
+    }
+    BSEG {
+        string BUKRS PK, FK "Company Code"
+        string BELNR PK, FK "FI Document Number"
+        string GJAHR PK, FK "Fiscal Year"
+        string BUZEI PK "Line Item Number"
+        string HKONT FK "G/L Account"
+        string LIFNR FK "Vendor Lookup"
+    }
+    ACDOCA {
+        string RLDNR PK "Ledger Type"
+        string RBUKRS PK "Company Code"
+        string GJAHR PK "Fiscal Year"
+        string BELNR PK "FI Document Number"
+        string DOCLN PK "6-Digit Line Item"
+        string HKONT FK "G/L Account"
+        string LIFNR FK "Vendor Lookup"
+        string PS_PSP_PNR FK "Linked WBS Element ID"
+    }
+    SKB1 {
+        string BUKRS PK "Company Code"
+        string SAKNR PK, FK "G/L Account Number"
+    }
+    SKAT {
+        string SPRAS PK "Language Key"
+        string KTOPL PK "Chart of Accounts"
+        string SAKNR PK "G/L Account Number"
+        string TXT50 "G/L Account Name"
+    }
+    CSKT {
+        string SPRAS PK "Language Key"
+        string KOSTL PK "Cost Center Number"
+        string DATBI PK "Valid To Date"
+        string KOKRS PK "Controlling Area"
+        string KTEXT "Cost Center Name"
+    }
+    CEPCT {
+        string SPRAS PK "Language Key"
+        string PRCTR PK "Profit Center Number"
+        string DATBI PK "Valid To Date"
+        string KOKRS PK "Controlling Area"
+        string KTEXT "Profit Center Name"
+    }
+    OPT_VIM_1HEAD {
+        string DOC_ID PK "VIM Document ID"
+        string EBELN FK "Associated PO"
+        string LIFNR FK "Invoiced Vendor"
+        string BELNR FK "Follow-on FI Document"
+        string GJAHR FK "Follow-on Fiscal Year"
+    }
+
+    BKPF ||--|{ BSEG : "groups rows into traditional accounting ledgers"
+    BKPF ||--|{ ACDOCA : "consolidates operational details down into unified index layouts"
+    SKB1 ||--o{ SKAT : "provides language descriptions via SAKNR"
+    SKB1 ||--o{ BSEG : "validates tracking accounts"
+    SKB1 ||--o{ ACDOCA : "validates tracking accounts"
+    CSKT ||--o{ BSEG : "links metadata text strings"
+    CSKT ||--o{ ACDOCA : "links metadata text strings"
+    CEPCT ||--o{ ACDOCA : "links structural tracking names"
