@@ -7,6 +7,7 @@ from pathlib import Path
 
 from flask import Flask, Response, abort, flash, redirect, render_template, request, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -53,6 +54,8 @@ class RepositoryDiagram(db.Model):
     diagram_type = db.Column(db.String(32), nullable=False, default="master")
     content = db.Column(db.Text, nullable=False)
     notes = db.Column(db.Text, nullable=True)
+    revision = db.Column(db.Integer, nullable=False, default=1)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
 
 
 @app.context_processor
@@ -62,6 +65,18 @@ def inject_saved_links():
     except Exception:
         links = []
     return {"saved_links": links, "editor_url": EDITOR_URL}
+
+
+def ensure_database_schema():
+    columns = {
+        row[1]
+        for row in db.session.execute(text("PRAGMA table_info(repository_diagram)")).fetchall()
+    }
+    if "revision" not in columns:
+        db.session.execute(text("ALTER TABLE repository_diagram ADD COLUMN revision INTEGER NOT NULL DEFAULT 1"))
+    if "is_active" not in columns:
+        db.session.execute(text("ALTER TABLE repository_diagram ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+    db.session.commit()
 
 
 def slugify(text):
@@ -184,7 +199,11 @@ def assemble_repository_diagram(diagram, seen=None, is_sub_include=False):
             continue
 
         include_name = Path(match.group(1).strip()).name
-        included = RepositoryDiagram.query.filter_by(project_id=diagram.project_id, name=include_name).first()
+        included = RepositoryDiagram.query.filter_by(
+            project_id=diagram.project_id,
+            name=include_name,
+            is_active=True,
+        ).first()
         sub_content = assemble_repository_diagram(included, seen=seen, is_sub_include=True) if included else None
         assembled.append(f"\n{sub_content}\n" if sub_content else f"%% ERROR: Missing include '{include_name}'\n")
 
@@ -207,6 +226,8 @@ def seed_repository_from_files():
                 name=path.name,
                 diagram_type="master",
                 content=path.read_text(encoding="utf-8"),
+                revision=1,
+                is_active=True,
             )
         )
 
@@ -217,6 +238,8 @@ def seed_repository_from_files():
                 name=path.name,
                 diagram_type="sub",
                 content=path.read_text(encoding="utf-8"),
+                revision=1,
+                is_active=True,
             )
         )
 
@@ -352,6 +375,16 @@ def delete_saved_diagram(diagram_id):
 @app.route("/repository")
 def repository():
     projects = ProjectFolder.query.order_by(ProjectFolder.name.asc()).all()
+    for project in projects:
+        project.active_diagrams = sorted(
+            [diagram for diagram in project.diagrams if diagram.is_active],
+            key=lambda diagram: (diagram.name, diagram.revision),
+        )
+        project.inactive_diagrams = sorted(
+            [diagram for diagram in project.diagrams if not diagram.is_active],
+            key=lambda diagram: (diagram.name, diagram.revision),
+            reverse=True,
+        )
     return render_template("repository.html", projects=projects)
 
 
@@ -393,6 +426,8 @@ def create_repository_diagram():
             name=filename,
             diagram_type=diagram_type if diagram_type in {"master", "sub"} else "master",
             content=content,
+            revision=1,
+            is_active=True,
         )
     )
     db.session.commit()
@@ -419,6 +454,8 @@ def upload_repository_file():
             name=filename,
             diagram_type=diagram_type if diagram_type in {"master", "sub"} else "master",
             content=content,
+            revision=1,
+            is_active=True,
         )
     )
     db.session.commit()
@@ -461,13 +498,35 @@ def update_repository_diagram(diagram_id):
         return redirect(url_for("repository"))
 
     try:
-        diagram.content = extract_code_from_mermaid_url(url)
+        new_content = extract_code_from_mermaid_url(url)
     except Exception as exc:
         flash(f"Could not read Mermaid source from that URL: {exc}")
         return redirect(url_for("repository"))
 
+    current_max_revision = (
+        db.session.query(db.func.max(RepositoryDiagram.revision))
+        .filter_by(project_id=diagram.project_id, name=diagram.name)
+        .scalar()
+        or diagram.revision
+        or 1
+    )
+    RepositoryDiagram.query.filter_by(
+        project_id=diagram.project_id,
+        name=diagram.name,
+        is_active=True,
+    ).update({"is_active": False})
+    new_diagram = RepositoryDiagram(
+        project_id=diagram.project_id,
+        name=diagram.name,
+        diagram_type=diagram.diagram_type,
+        content=new_content,
+        notes=diagram.notes,
+        revision=current_max_revision + 1,
+        is_active=True,
+    )
+    db.session.add(new_diagram)
     db.session.commit()
-    flash(f"{diagram.name} updated from the Mermaid editor.")
+    flash(f"{diagram.name} saved as revision {new_diagram.revision}. Revision {diagram.revision} was deactivated.")
     return redirect(url_for("repository"))
 
 
@@ -475,7 +534,7 @@ def update_repository_diagram(diagram_id):
 def export_repository_diagram(diagram_id):
     diagram = RepositoryDiagram.query.get_or_404(diagram_id)
     content = assemble_repository_diagram(diagram) if diagram.diagram_type == "master" else diagram.content
-    filename = slugify(f"{diagram.project.name}_{diagram.name}") + ".mmd"
+    filename = slugify(f"{diagram.project.name}_{diagram.name}_r{diagram.revision}") + ".mmd"
     return Response(
         content,
         mimetype="text/plain",
@@ -486,5 +545,6 @@ def export_repository_diagram(diagram_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        ensure_database_schema()
         seed_repository_from_files()
     app.run(host="0.0.0.0", port=APP_PORT, debug=True)

@@ -11,6 +11,7 @@ A combined Flask app built from `mermaid_dashboard` and `mermaid-display-app`.
 - Recursive `%% INCLUDE sub_diagrams/name.mmd` rendering within each project.
 - Mermaid canvas editing for repository diagrams.
 - Per-diagram `.mmd` export from the database.
+- Automatic repository revisions: saving from Canvas creates a new active revision and deactivates the old one.
 
 ## Run
 
