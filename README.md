@@ -34,5 +34,5 @@ Open `http://localhost:5013`.
 Set `MERMAID_EDITOR_URL` if your Mermaid Live Editor is not running on `http://localhost:9000`.
 Set `PORT` if you want the Flask app on a different port.
 
-Set `OLLAMA_URL` if Ollama is not running on `http://127.0.0.1:11434`.
+Set `OLLAMA_URL` if Ollama is not running on `http://192.168.1.249:11434`.
 Set `OLLAMA_MODEL` to change the default assistant model. The UI also lets you override the model per request.

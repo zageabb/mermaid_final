@@ -212,6 +212,15 @@ const help = {
   c4: `<strong>C4 syntax</strong><ul><li>Start: <code>C4Context</code> or <code>C4Container</code>.</li><li>Objects: <code>Person(id, "Name")</code>, <code>System(id, "Name")</code>, <code>Container(...)</code>.</li><li>Lines: <code>Rel(a, b, "Uses")</code>.</li><li>Notes: use boundaries for groups and concise relationship labels.</li></ul>`
 };
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function detectType(source) {
   const first = source.trim().split(/\n/)[0] || '';
   if (/^sequenceDiagram/.test(first)) return 'sequence';
@@ -412,9 +421,9 @@ document.getElementById('askAssistantBtn').addEventListener('click', async () =>
   const model = document.getElementById('modelInput').value.trim();
   const log = document.getElementById('assistantLog');
   if (!prompt) return;
-  log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>You</strong><div>${prompt.replace(/</g, '&lt;')}</div></div>`);
+  log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>You</strong><div>${escapeHtml(prompt)}</div></div>`);
   document.getElementById('assistantPrompt').value = '';
-  log.insertAdjacentHTML('beforeend', `<div class="mb-3 text-muted" id="assistantWorking">Thinking with ${model}...</div>`);
+  log.insertAdjacentHTML('beforeend', `<div class="mb-3 text-muted" id="assistantWorking">Thinking with ${escapeHtml(model)}...</div>`);
   log.scrollTop = log.scrollHeight;
   try {
     const response = await fetch('{{ url_for("assistant_chat") }}', {
@@ -422,13 +431,20 @@ document.getElementById('askAssistantBtn').addEventListener('click', async () =>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, prompt, diagram: sourceInput.value })
     });
-    const data = await response.json();
+    const responseText = await response.text();
+    let data = {};
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      const snippet = responseText.replace(/\s+/g, ' ').trim().slice(0, 240);
+      throw new Error(snippet ? `Assistant returned a non-JSON response: ${snippet}` : 'Assistant returned an empty response.');
+    }
     document.getElementById('assistantWorking')?.remove();
     if (!response.ok) throw new Error(data.error || 'Assistant request failed.');
-    log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>${data.model}</strong><pre class="bg-white border rounded p-2 small text-wrap" style="white-space: pre-wrap;">${data.response.replace(/</g, '&lt;')}</pre></div>`);
+    log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>${escapeHtml(data.model || model)}</strong><pre class="bg-white border rounded p-2 small text-wrap" style="white-space: pre-wrap;">${escapeHtml(data.response || '')}</pre></div>`);
   } catch (error) {
     document.getElementById('assistantWorking')?.remove();
-    log.insertAdjacentHTML('beforeend', `<div class="alert alert-danger small">${error.message}</div>`);
+    log.insertAdjacentHTML('beforeend', `<div class="alert alert-danger small">${escapeHtml(error.message)}</div>`);
   }
   log.scrollTop = log.scrollHeight;
 });

@@ -21,7 +21,7 @@ LLM_CONTEXT_DIR = BASE_DIR / "llm_context"
 STANDARD_INSTRUCTIONS_FILE = LLM_CONTEXT_DIR / "standard_instructions.md"
 MERMAID_DOCUMENTATION_FILE = LLM_CONTEXT_DIR / "mermaid_documentation.md"
 EDITOR_URL = os.environ.get("MERMAID_EDITOR_URL", "http://localhost:9000")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.1.249:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:e2b")
 APP_PORT = int(os.environ.get("PORT", "5013"))
 DEFAULT_NEW_DIAGRAM = """flowchart TD
@@ -586,7 +586,7 @@ def update_repository_diagram(diagram_id):
 
 @app.route("/assistant/chat", methods=["POST"])
 def assistant_chat():
-    payload = request.get_json(force=True) or {}
+    payload = request.get_json(silent=True) or {}
     prompt = (payload.get("prompt") or "").strip()
     diagram = payload.get("diagram") or ""
     model = (payload.get("model") or OLLAMA_MODEL).strip()
@@ -628,10 +628,18 @@ Give a concise answer. If you suggest code, provide a complete Mermaid snippet o
     try:
         with urllib.request.urlopen(request_obj, timeout=120) as response:
             result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")[:500]
+        return jsonify({"error": f"Ollama returned HTTP {exc.code}: {error_body or exc.reason}"}), 502
     except urllib.error.URLError as exc:
-        return jsonify({"error": f"Could not reach Ollama at {OLLAMA_URL}: {exc}"}), 502
+        return jsonify({"error": f"Could not reach Ollama at {OLLAMA_URL}: {exc.reason}"}), 502
+    except TimeoutError:
+        return jsonify({"error": f"Ollama timed out at {OLLAMA_URL}."}), 504
     except json.JSONDecodeError:
         return jsonify({"error": "Ollama returned an unreadable response."}), 502
+    except Exception as exc:
+        app.logger.exception("Assistant request failed")
+        return jsonify({"error": f"Assistant request failed: {exc}"}), 500
 
     return jsonify({"response": result.get("response", ""), "model": model})
 
