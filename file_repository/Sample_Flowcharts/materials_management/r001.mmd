@@ -1,0 +1,81 @@
+erDiagram
+    LFA1 {
+        string LIFNR PK "Vendor Account Number"
+        string ADRNR FK "Address Reference"
+        string NAME1 "Vendor Name"
+    }
+    MARA {
+        string MATNR PK "Material Number"
+        string MEINS "Base UOM"
+    }
+    MAKT {
+        string MATNR PK, FK "Material Number"
+        string SPRAS PK "Language Key"
+        string MAKTX "Material Description"
+    }
+    EBAN {
+        string BANFN PK "PR Number"
+        string BNFPO PK "PR Item"
+        string MATNR FK "Material Number"
+        string WERKS FK "Plant"
+        string EBELN FK "Follow-on PO"
+        string EBELP FK "Follow-on PO Item"
+    }
+    EKKO {
+        string EBELN PK "PO Number"
+        string LIFNR FK "Vendor"
+        string BUKRS "Company Code"
+        string ZTERM FK "Payment Terms"
+    }
+    EKPO {
+        string EBELN PK, FK "PO Number"
+        string EBELP PK "PO Item"
+        string MATNR FK "Material Number"
+        string WERKS FK "Plant"
+        string BANFN FK "Originating PR"
+        string BNFPO FK "Originating PR Item"
+    }
+    EKBE {
+        string EBELN PK, FK "PO Number"
+        string EBELP PK, FK "PO Item"
+        string ZEKKN PK "Account Assgmt Seq"
+        string VGABE PK "Transaction Type"
+        string GJAHR PK "Mat Doc Year"
+        string BELNR PK "Mat Doc Number"
+        string BUZEI PK "Mat Doc Item"
+    }
+    EKET {
+        string EBELN PK, FK "PO Number"
+        string EBELP PK, FK "PO Item"
+        string ETENR PK "Schedule Line Counter"
+    }
+    EKES {
+        string EBELN PK, FK "PO Number"
+        string EBELP PK, FK "PO Item"
+        string ETENR PK, FK "Confirmation Counter"
+    }
+    MKPF {
+        string MBLNR PK "Material Doc Number"
+        string MJAHR PK "Material Doc Year"
+    }
+    MSEG {
+        string MBLNR PK, FK "Material Doc Number"
+        string MJAHR PK, FK "Material Doc Year"
+        string ZEILE PK "Material Doc Item"
+        string EBELN FK "Linked PO Number"
+        string EBELP FK "Linked PO Item"
+        string MATNR FK "Material Number"
+        string WERKS FK "Plant"
+    }
+
+    MARA ||--o{ MAKT : "stores localized text naming strings"
+    MARA ||--o{ EKPO : "Purchase link via material code"
+    LFA1 ||--o{ EKKO : "vendor link via BP number"
+    EKKO ||--|{ EKPO : "summarizes lines into parent structural header"
+    EBAN ||--o{ EKPO : "cross-references source internal demand records"
+    EKPO ||--o{ EKBE : "tracks downstream receipts, verifications, and invoices"
+    EKPO ||--o{ EKET : "maps explicit chronological delivery line rules"
+    EKPO ||--o{ EKES : "references vendor inbound confirmations and receipts"
+    EKET ||--o{ EKES : "optionally maps confirmations back to target lines via ETENR"
+    MKPF ||--|{ MSEG : "summarizes multiple segment rows into master transactions"
+    EKPO ||--o{ MSEG : "tracks goods fulfillment parameters"

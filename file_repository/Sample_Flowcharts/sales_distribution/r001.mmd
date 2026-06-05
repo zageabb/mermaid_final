@@ -1,0 +1,51 @@
+erDiagram
+    VBAK {
+        string VBELN PK "Sales Document ID"
+        string KUNNR FK "Sold-to Customer"
+        string BUKRS "Company Code"
+    }
+    VBAP {
+        string VBELN PK, FK "Sales Document ID"
+        string POSNR PK "Sales Item Line"
+        string MATNR FK "Material Number"
+        string WERKS FK "Plant"
+    }
+    LIKP {
+        string VBELN PK "Delivery Document ID"
+        string KUNNR "Ship-to Customer"
+    }
+    LIPS {
+        string VBELN PK, FK "Delivery Document ID"
+        string POSNR PK "Delivery Item Line"
+        string VGBEL FK "Preceding Sales Order"
+        string VGPOS FK "Preceding Sales Item"
+        string MATNR FK "Material Number"
+    }
+    VBRK {
+        string VBELN PK "Billing Document ID"
+        string BUKRS "Company Code"
+        string KUNRG "Payer Customer"
+    }
+    VBRP {
+        string VBELN PK, FK "Billing Document ID"
+        string POSNR PK "Billing Item Line"
+        string VGBEL FK "Preceding Delivery Line"
+        string VGPOS FK "Preceding Delivery Item"
+        string MATNR FK "Material Number"
+    }
+    TVKOT {
+        string SPRAS PK "Language Key"
+        string VKORG PK "Sales Organization"
+        string VTEXT "Sales Org Text"
+    }
+    TVAPT {
+        string SPRAS PK "Language Key"
+        string PSTYV PK "Item Category Key"
+        string VTEXT "Category Text"
+    }
+
+    VBAK ||--|{ VBAP : "summarizes transactional rows into parent layout headers"
+    LIKP ||--|{ LIPS : "summarizes shipping segments into target headers"
+    VBRK ||--|{ VBRP : "summarizes accounting billing components into invoice headers"
+    VBAP ||--o{ LIPS : "tracks shipping execution lines using VGBEL / VGPOS pairs"
+    LIPS ||--o{ VBRP : "tracks billing execution lines using VGBEL / VGPOS pairs"

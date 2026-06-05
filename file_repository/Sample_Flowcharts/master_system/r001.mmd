@@ -1,0 +1,14 @@
+flowchart TB
+    %% Master external connections
+    ClientApp --> API_Gateway
+    API_Gateway --> UserDB[(User Database)]
+    PaymentProcessor --> PaymentDB[(Payment DB)]
+
+    %% Dynamically pull in the sub-documents
+    %% INCLUDE sub_diagrams/client_app.mmd
+    %% INCLUDE sub_diagrams/api_gateway.mmd
+    %% INCLUDE sub_diagrams/payment_processor.mmd
+
+    %% Joins BETWEEN the included sub-diagrams
+    Web --> Auth
+    Router --> StripeAPI

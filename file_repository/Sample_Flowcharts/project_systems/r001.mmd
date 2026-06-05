@@ -1,0 +1,31 @@
+erDiagram
+    PROJ {
+        string PSPNR PK "Internal Project ID"
+        string PSPID "External Project ID Layout"
+        string WERKS FK "Plant"
+    }
+    PRPS {
+        string PSP_PNR PK "Internal WBS ID"
+        string PSPHI FK "Parent Project Header ID"
+        string POSID "External WBS Path String"
+        string WERKS FK "Plant"
+    }
+    PRPM {
+        string MANDT PK "Client Isolation Key"
+        string POSNR PK, FK "Internal WBS ID Link"
+        string POST1 "WBS Short Description"
+    }
+    AUFK {
+        string AUFNR PK "Order / Network Number"
+        string WERKS FK "Plant"
+        string PRCTR FK "Profit Center"
+    }
+    AFVC {
+        string AUFPL PK "Internal Network Plan ID"
+        string APLZL PK "Internal Activity Counter"
+        string PROJN FK "Associated WBS Element ID"
+    }
+
+    PROJ ||--|{ PRPS : "groups structural WBS breakdowns into parent definitions"
+    PRPS ||--|| PRPM : "maps localized string layouts using POSNR -> PSP_PNR equivalents"
+    PRPS ||--o{ AFVC : "associates operational tasks directly to structural control blocks"

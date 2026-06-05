@@ -1,0 +1,38 @@
+erDiagram
+    QALS {
+        string PRUEFLOS PK "Inspection Lot Number"
+        string MATNR FK "Material"
+        string WERKS FK "Plant"
+        string EBELN FK "Originating PO"
+        string EBELP FK "Originating PO Item"
+        string MBLNR FK "Linked Material Doc"
+        string MJAHR FK "Linked Mat Doc Year"
+        string ZEILE FK "Linked Mat Doc Item"
+        string AUFNR FK "Associated Order"
+        string ART FK "Inspection Type"
+    }
+    QAMV {
+        string PRUEFLOS PK, FK "Inspection Lot Number"
+        string MERKNR PK "Characteristic Number"
+    }
+    QASE {
+        string PRUEFLOS PK, FK "Inspection Lot Number"
+        string MERKNR PK, FK "Characteristic Number"
+        string PROBENEINR PK "Sample Number"
+        string ENTNR PK "Single Result Counter"
+    }
+    QFMN {
+        string QMNUM PK "Notification Number"
+        string MATNR FK "Material Master"
+        string MAWERK FK "Plant Master"
+        string FERTAUFNR FK "Associated Production Order"
+    }
+    TQ30T {
+        string SPRAS PK "Language Key"
+        string ART PK "Inspection Type Code"
+        string TXT30 "Inspection Type Text"
+    }
+
+    QALS ||--|{ QAMV : "holds technical configuration characteristics specifications"
+    QAMV ||--|{ QASE : "details specific empirical value results metrics"
+    TQ30T ||--o{ QALS : "provides translations for transaction type fields via ART"

@@ -5,7 +5,7 @@
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
             <h1 class="h3 mb-1">File Repository</h1>
-            <p class="text-muted mb-0">Database-backed project folders, flowcharts, Mermaid editor editing, and .mmd export.</p>
+            <p class="text-muted mb-0">File-backed project folders, flowcharts, Mermaid editor editing, revisions, and .mmd export.</p>
         </div>
         <div class="d-flex flex-wrap toolbar">
             <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#projectModal">New Project</button>
@@ -153,9 +153,9 @@
                     <div class="row g-3">
                         <div class="col-md-7">
                             <label class="form-label fw-semibold">Project</label>
-                            <select class="form-select" name="project_id" required>
+                            <select class="form-select" name="project_slug" required>
                                 {% for project in projects %}
-                                    <option value="{{ project.id }}">{{ project.name }}</option>
+                                    <option value="{{ project.slug }}">{{ project.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -197,9 +197,9 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Project</label>
-                        <select class="form-select" name="project_id" required>
+                        <select class="form-select" name="project_slug" required>
                             {% for project in projects %}
-                                <option value="{{ project.id }}">{{ project.name }}</option>
+                                <option value="{{ project.slug }}">{{ project.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
