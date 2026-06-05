@@ -10,13 +10,28 @@
         body { background: #f5f7fb; color: #1f2937; }
         .navbar { min-height: 56px; }
         .app-shell { min-height: calc(100vh - 56px); }
-        .canvas-frame { width: 100%; height: calc(100vh - 105px); border: 0; background: white; }
         .table-fixed { table-layout: fixed; }
         .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; }
         .child-file td:first-child { padding-left: 2rem; }
         .toolbar { gap: .5rem; }
         .diagram-stage { height: calc(100vh - 57px); background: #fbfcfe; overflow: hidden; }
         .code-editor { min-height: 60vh; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.5; }
+        .editor-workbench { height: calc(100vh - 105px); display: grid; grid-template-columns: minmax(340px, 42%) 1fr minmax(300px, 360px); overflow: hidden; }
+        .editor-workbench.assistant-collapsed { grid-template-columns: minmax(340px, 42%) 1fr 0; }
+        .source-pane, .preview-pane, .assistant-pane { min-height: 0; border-right: 1px solid #dbe1ea; }
+        .source-pane textarea { height: 100%; resize: none; border: 0; border-radius: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9rem; line-height: 1.45; }
+        .preview-surface { height: 100%; overflow: auto; background: #fbfcfe; }
+        .preview-box { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .assistant-pane { background: #fff; overflow: hidden; display: flex; flex-direction: column; }
+        .assistant-collapsed .assistant-pane { display: none; }
+        .assistant-log { flex: 1; overflow: auto; background: #f8fafc; }
+        .help-panel { max-height: 150px; overflow: auto; border-top: 1px solid #dbe1ea; background: #fff; }
+        @media (max-width: 992px) {
+            .editor-workbench, .editor-workbench.assistant-collapsed { height: auto; min-height: calc(100vh - 105px); display: block; overflow: visible; }
+            .source-pane textarea { height: 45vh; }
+            .preview-surface { height: 45vh; }
+            .assistant-pane { height: 420px; }
+        }
     </style>
 </head>
 <body>
@@ -41,7 +56,7 @@
                     </ul>
                 </li>
             </ul>
-            <span class="navbar-text small text-light-emphasis">Editor: {{ editor_url }}</span>
+            <span class="navbar-text small text-light-emphasis">Ollama: {{ ollama_model }}</span>
         </div>
     </nav>
 

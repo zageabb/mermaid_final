@@ -2,11 +2,13 @@ import base64
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from flask import Flask, Response, abort, flash, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, url_for
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -16,6 +18,8 @@ SAVED_DIAGRAM_DIR = BASE_DIR / "saved_diagrams"
 SAVED_LIBRARY_FILE = SAVED_DIAGRAM_DIR / "saved_links.json"
 FILE_REPOSITORY_DIR = BASE_DIR / "file_repository"
 EDITOR_URL = os.environ.get("MERMAID_EDITOR_URL", "http://localhost:9000")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:e2b")
 APP_PORT = int(os.environ.get("PORT", "5013"))
 DEFAULT_NEW_DIAGRAM = """flowchart TD
     Start[New diagram] --> Next[Edit me in Mermaid]
@@ -69,7 +73,7 @@ class ProjectFolder:
 
 @app.context_processor
 def inject_saved_links():
-    return {"saved_links": load_saved_links(), "editor_url": EDITOR_URL}
+    return {"saved_links": load_saved_links(), "editor_url": EDITOR_URL, "ollama_model": OLLAMA_MODEL}
 
 
 def slugify(text):
@@ -345,19 +349,25 @@ def assemble_repository_diagram(diagram, seen=None, is_sub_include=False):
 
 @app.route("/")
 def canvas():
-    current_url = request.args.get("url", default_canvas_url())
     current_name = request.args.get("name", "New Diagram Canvas")
     save_mode = request.args.get("save_mode", "library")
     repository_diagram_id = request.args.get("repository_diagram_id")
-    source = ""
+    source = request.args.get("source", "")
     if save_mode == "repository" and repository_diagram_id:
         try:
             source = load_repository_diagram(*repository_diagram_id.split("/", 2)).content
         except Exception:
             source = ""
+    elif not source and request.args.get("url"):
+        try:
+            source = extract_code_from_mermaid_url(request.args["url"])
+        except Exception:
+            source = DEFAULT_NEW_DIAGRAM
+    elif not source:
+        source = DEFAULT_NEW_DIAGRAM
+
     return render_template(
         "canvas.html",
-        current_url=current_url,
         current_name=current_name,
         save_mode=save_mode,
         repository_diagram_id=repository_diagram_id,
@@ -367,19 +377,26 @@ def canvas():
 
 @app.route("/new")
 def new_canvas():
-    return redirect(url_for("canvas", url=default_canvas_url(), name="Untitled Diagram"))
+    return redirect(url_for("canvas", name="Untitled Diagram", source=DEFAULT_NEW_DIAGRAM))
 
 
 @app.route("/save", methods=["POST"])
 def save_diagram():
+    source = request.form.get("source", "").strip()
     url = request.form.get("url", "").strip()
     description = request.form.get("description", "").strip()
     notes = request.form.get("notes", "").strip()
 
-    if not url or not description:
-        flash("A diagram URL and description are required.")
+    if not source and url:
+        try:
+            source = extract_code_from_mermaid_url(url)
+        except Exception:
+            source = ""
+    if not source or not description:
+        flash("Diagram source and description are required.")
         return redirect(request.referrer or url_for("library"))
 
+    url = convert_mmd_text_to_mermaid_url(source)
     links = load_saved_links()
     diagram = SavedLink(id=next_saved_link_id(), url=url, description=description, notes=notes)
     links.append(diagram)
@@ -514,7 +531,6 @@ def edit_file(diagram_id):
     return redirect(
         url_for(
             "canvas",
-            url=convert_mmd_text_to_mermaid_url(diagram.content),
             name=f"{diagram.project_slug} / {diagram.name} r{diagram.revision}",
             save_mode="repository",
             repository_diagram_id=diagram.id,
@@ -547,6 +563,52 @@ def update_repository_diagram(diagram_id):
     )
     flash(f"{diagram.name} saved as revision {revision}. Revision {diagram.revision} remains inactive history.")
     return redirect(url_for("repository"))
+
+
+@app.route("/assistant/chat", methods=["POST"])
+def assistant_chat():
+    payload = request.get_json(force=True) or {}
+    prompt = (payload.get("prompt") or "").strip()
+    diagram = payload.get("diagram") or ""
+    model = (payload.get("model") or OLLAMA_MODEL).strip()
+
+    if not prompt:
+        return jsonify({"error": "Prompt is required."}), 400
+
+    full_prompt = f"""You are helping edit a Mermaid diagram.
+
+Current Mermaid diagram:
+```mermaid
+{diagram}
+```
+
+User request:
+{prompt}
+
+Give a concise answer. If you suggest code, provide a complete Mermaid snippet or a clear patch-style replacement."""
+    request_payload = json.dumps(
+        {
+            "model": model,
+            "prompt": full_prompt,
+            "stream": False,
+        }
+    ).encode("utf-8")
+    request_obj = urllib.request.Request(
+        f"{OLLAMA_URL}/api/generate",
+        data=request_payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request_obj, timeout=120) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        return jsonify({"error": f"Could not reach Ollama at {OLLAMA_URL}: {exc}"}), 502
+    except json.JSONDecodeError:
+        return jsonify({"error": "Ollama returned an unreadable response."}), 502
+
+    return jsonify({"response": result.get("response", ""), "model": model})
 
 
 @app.route("/repository/export/<path:diagram_id>")

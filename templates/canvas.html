@@ -1,92 +1,301 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="bg-white border-bottom px-3 py-2 d-flex align-items-center justify-content-between">
+<div class="bg-white border-bottom px-3 py-2 d-flex align-items-center justify-content-between gap-3">
     <div class="d-flex align-items-center gap-2 overflow-hidden">
-        <span class="badge text-bg-primary">Active Canvas</span>
+        <span class="badge text-bg-primary">Live Editor</span>
         <h1 class="h5 mb-0 text-truncate" id="activeWorkspaceTitle">{{ current_name }}</h1>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap toolbar">
+        <select class="form-select form-select-sm" id="diagramTypeSelect" style="width: 190px;" aria-label="Diagram type">
+            <option value="flowchart">Flowchart</option>
+            <option value="sequence">Sequence</option>
+            <option value="class">Class</option>
+            <option value="state">State</option>
+            <option value="er">ER</option>
+            <option value="journey">User Journey</option>
+            <option value="gantt">Gantt</option>
+            <option value="pie">Pie</option>
+            <option value="quadrant">Quadrant</option>
+            <option value="mindmap">Mindmap</option>
+            <option value="timeline">Timeline</option>
+            <option value="gitgraph">Git Graph</option>
+            <option value="requirement">Requirement</option>
+            <option value="c4">C4 Context</option>
+        </select>
+        <button class="btn btn-outline-secondary btn-sm" type="button" id="insertStarterBtn">Starter</button>
         <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('new_canvas') }}">New</a>
-        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#saveModal">
-            {% if save_mode == "repository" %}Save Back{% else %}Save State{% endif %}
+        <button class="btn btn-outline-dark btn-sm" type="button" id="assistantToggle">Hide AI</button>
+        <button class="btn btn-primary btn-sm" type="submit" form="saveForm">
+            {% if save_mode == "repository" %}Create Revision{% else %}Save{% endif %}
         </button>
     </div>
 </div>
 
-<iframe id="mermaidFrame" class="canvas-frame" src="{{ current_url }}"></iframe>
+<form id="saveForm" action="{{ url_for('update_repository_diagram', diagram_id=repository_diagram_id) if save_mode == 'repository' else url_for('save_diagram') }}" method="POST">
+    <input type="hidden" name="url" id="urlInput">
+    <div class="editor-workbench" id="editorWorkbench">
+        <section class="source-pane d-flex flex-column">
+            <div class="px-3 py-2 bg-white border-bottom d-flex justify-content-between align-items-center">
+                <strong class="small">Mermaid Source</strong>
+                <span class="small text-muted" id="detectedType">flowchart</span>
+            </div>
+            <textarea class="form-control" id="sourceInput" name="source" spellcheck="false">{{ source }}</textarea>
+            <div class="help-panel p-3 small" id="helpPanel"></div>
+        </section>
 
-<div class="modal fade" id="saveModal" tabindex="-1" aria-labelledby="saveModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <form action="{{ url_for('update_repository_diagram', diagram_id=repository_diagram_id) if save_mode == 'repository' else url_for('save_diagram') }}" method="POST">
-                <div class="modal-header">
-                    <h2 class="modal-title h5" id="saveModalLabel">
-                        {% if save_mode == "repository" %}Save Back to Repository{% else %}Save Current Diagram State{% endif %}
-                    </h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <section class="preview-pane d-flex flex-column">
+            <div class="px-3 py-2 bg-white border-bottom d-flex justify-content-between align-items-center">
+                <strong class="small">Preview</strong>
+                <span class="small text-muted" id="renderState">Ready</span>
+            </div>
+            <div class="preview-surface">
+                <div class="preview-box" id="diagramPreview"></div>
+            </div>
+        </section>
+
+        <aside class="assistant-pane" id="assistantPane">
+            <div class="px-3 py-2 border-bottom">
+                <div class="d-flex gap-2 align-items-center">
+                    <strong class="small me-auto">AI Assistance</strong>
+                    <input class="form-control form-control-sm" id="modelInput" value="{{ ollama_model }}" aria-label="Ollama model">
                 </div>
-                <div class="modal-body">
-                    <input type="hidden" name="url" id="hiddenUrlInput">
-                    <div class="alert alert-secondary small">
-                        If the editor changed but the URL below did not update, copy the current Mermaid editor URL and paste it here before saving.
-                    </div>
-                    <div class="mb-3">
-                        <label for="visibleUrlInput" class="form-label fw-semibold">Mermaid Editor URL</label>
-                        <textarea class="form-control file-path" id="visibleUrlInput" rows="4" required></textarea>
-                    </div>
-                    {% if save_mode == "repository" %}
-                        <div class="mb-3">
-                            <label for="sourceInput" class="form-label fw-semibold">Mermaid Source for New Revision</label>
-                            <textarea class="form-control code-editor" id="sourceInput" name="source" rows="10" required>{{ source }}</textarea>
-                        </div>
-                    {% endif %}
-                    {% if save_mode != "repository" %}
-                        <div class="mb-3">
-                            <label for="description" class="form-label fw-semibold">Diagram Description</label>
-                            <input type="text" class="form-control" id="description" name="description" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="notes" class="form-label fw-semibold">Notes</label>
-                            <textarea class="form-control" id="notes" name="notes" rows="4"></textarea>
-                        </div>
-                    {% endif %}
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">
-                        {% if save_mode == "repository" %}Create Revision{% else %}Save Diagram{% endif %}
-                    </button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="assistant-log p-3 small" id="assistantLog">
+                <div class="text-muted">Ask for a rewrite, syntax fix, explanation, or diagram expansion. The current diagram is sent with your prompt.</div>
+            </div>
+            <div class="p-3 border-top">
+                <textarea class="form-control form-control-sm mb-2" id="assistantPrompt" rows="4" placeholder="Ask Gemma to improve this diagram..."></textarea>
+                <button class="btn btn-primary btn-sm w-100" type="button" id="askAssistantBtn">Ask</button>
+            </div>
+        </aside>
     </div>
-</div>
+
+    {% if save_mode != "repository" %}
+        <div class="position-fixed bottom-0 start-0 m-3 bg-white border rounded p-3 shadow-sm" style="z-index: 1030; width: min(420px, calc(100vw - 2rem));">
+            <div class="mb-2">
+                <label class="form-label fw-semibold small" for="description">Diagram Description</label>
+                <input type="text" class="form-control form-control-sm" id="description" name="description" value="{{ current_name if current_name != 'New Diagram Canvas' else '' }}" required>
+            </div>
+            <div>
+                <label class="form-label fw-semibold small" for="notes">Notes</label>
+                <textarea class="form-control form-control-sm" id="notes" name="notes" rows="2"></textarea>
+            </div>
+        </div>
+    {% endif %}
+</form>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 <script>
-    document.getElementById('saveModal').addEventListener('show.bs.modal', function () {
-        const iframe = document.getElementById('mermaidFrame');
-        const title = document.getElementById('activeWorkspaceTitle').innerText;
-        const urlInput = document.getElementById('hiddenUrlInput');
-        const visibleUrlInput = document.getElementById('visibleUrlInput');
-        const description = document.getElementById('description');
+const sourceInput = document.getElementById('sourceInput');
+const preview = document.getElementById('diagramPreview');
+const renderState = document.getElementById('renderState');
+const detectedType = document.getElementById('detectedType');
+const helpPanel = document.getElementById('helpPanel');
+const diagramTypeSelect = document.getElementById('diagramTypeSelect');
+const urlInput = document.getElementById('urlInput');
 
-        try {
-            urlInput.value = iframe.contentWindow.location.href;
-        } catch (error) {
-            urlInput.value = iframe.src;
-        }
-        visibleUrlInput.value = urlInput.value;
+const starters = {
+  flowchart: `flowchart TD
+    Start[Start] --> Decision{Decision}
+    Decision -->|Yes| Done[Done]
+    Decision -->|No| Retry[Try again]
+    Retry --> Decision`,
+  sequence: `sequenceDiagram
+    participant User
+    participant App
+    User->>App: Request
+    App-->>User: Response`,
+  class: `classDiagram
+    class Order {
+      +String id
+      +submit()
+    }
+    Order --> Customer`,
+  state: `stateDiagram-v2
+    [*] --> Draft
+    Draft --> Published
+    Published --> [*]`,
+  er: `erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER {
+      string id
+      date created_at
+    }`,
+  journey: `journey
+    title Checkout
+    section Browse
+      Open product page: 5: User
+      Add to basket: 4: User
+    section Pay
+      Submit payment: 3: User, Gateway`,
+  gantt: `gantt
+    title Project Plan
+    dateFormat  YYYY-MM-DD
+    section Build
+    Prototype :a1, 2026-06-01, 3d
+    Review    :after a1, 2d`,
+  pie: `pie title Diagram Types
+    "Flowcharts" : 45
+    "Sequence" : 25
+    "Other" : 30`,
+  quadrant: `quadrantChart
+    title Priorities
+    x-axis Low Effort --> High Effort
+    y-axis Low Impact --> High Impact
+    Quick win: [0.2, 0.8]`,
+  mindmap: `mindmap
+  root((Mermaid))
+    Flowcharts
+    Sequences
+    ER diagrams`,
+  timeline: `timeline
+    title Roadmap
+    2026 Q2 : Build editor
+    2026 Q3 : Add assistant`,
+  gitgraph: `gitGraph
+    commit
+    branch feature
+    checkout feature
+    commit
+    checkout main
+    merge feature`,
+  requirement: `requirementDiagram
+    requirement editor {
+      id: 1
+      text: live preview
+      risk: low
+      verifymethod: test
+    }`,
+  c4: `C4Context
+    title System Context
+    Person(user, "User")
+    System(app, "Mermaid Final")
+    Rel(user, app, "Creates diagrams")`
+};
 
-        if (description) {
-            description.value = title && title !== 'New Diagram Canvas' ? title : '';
-        }
+const help = {
+  flowchart: 'Flowcharts use arrows such as A-->B, labels like A[Box], decisions like D{Question}, and directions TD/LR/RL/BT.',
+  sequence: 'Sequence diagrams use participant declarations and messages like A->>B: Request or B-->>A: Reply.',
+  class: 'Class diagrams define class blocks and relationships such as Animal <|-- Dog, Order --> Customer.',
+  state: 'State diagrams model transitions. Use [*] for start/end and A --> B for movement.',
+  er: 'ER diagrams use cardinality markers like ||--o{ and entity blocks with fields.',
+  journey: 'Journey diagrams group tasks into sections and score each step from 1 to 5.',
+  gantt: 'Gantt charts need a dateFormat and tasks with dates, durations, or dependencies.',
+  pie: 'Pie charts use quoted labels and numeric values.',
+  quadrant: 'Quadrant charts plot labeled points with x/y values from 0 to 1.',
+  mindmap: 'Mindmaps use indentation to create hierarchy below a root node.',
+  timeline: 'Timelines use dated or grouped entries under a title.',
+  gitgraph: 'Git graphs use commit, branch, checkout, merge, and cherry-pick style commands.',
+  requirement: 'Requirement diagrams describe requirements, elements, and relationships for traceability.',
+  c4: 'C4 diagrams describe people, systems, containers, and relationships with C4Context/C4Container syntax.'
+};
+
+function detectType(source) {
+  const first = source.trim().split(/\n/)[0] || '';
+  if (/^sequenceDiagram/.test(first)) return 'sequence';
+  if (/^classDiagram/.test(first)) return 'class';
+  if (/^stateDiagram/.test(first)) return 'state';
+  if (/^erDiagram/.test(first)) return 'er';
+  if (/^journey/.test(first)) return 'journey';
+  if (/^gantt/.test(first)) return 'gantt';
+  if (/^pie/.test(first)) return 'pie';
+  if (/^quadrantChart/.test(first)) return 'quadrant';
+  if (/^mindmap/.test(first)) return 'mindmap';
+  if (/^timeline/.test(first)) return 'timeline';
+  if (/^gitGraph/.test(first)) return 'gitgraph';
+  if (/^requirementDiagram/.test(first)) return 'requirement';
+  if (/^C4/.test(first)) return 'c4';
+  return 'flowchart';
+}
+
+function updateHelp() {
+  const type = detectType(sourceInput.value);
+  detectedType.textContent = type;
+  diagramTypeSelect.value = type;
+  helpPanel.textContent = help[type] || help.flowchart;
+}
+
+function updateUrlSnapshot() {
+  try {
+    const state = { code: sourceInput.value, mermaid: '{"theme":"default"}', autoSync: true, updateDiagram: true, updateEditor: true };
+    urlInput.value = `local-editor:${btoa(unescape(encodeURIComponent(JSON.stringify(state))))}`;
+  } catch (error) {
+    urlInput.value = '';
+  }
+}
+
+let renderTimer;
+async function renderDiagram() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(async () => {
+    updateHelp();
+    updateUrlSnapshot();
+    renderState.textContent = 'Rendering';
+    try {
+      mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'default', maxTextSize: 300000 });
+      const id = `diagram-${Date.now()}`;
+      const { svg } = await mermaid.render(id, sourceInput.value);
+      preview.innerHTML = svg;
+      const svgElement = preview.querySelector('svg');
+      if (svgElement) {
+        svgElement.style.maxWidth = 'none';
+        svgElement.style.width = '100%';
+        svgElement.style.height = 'auto';
+      }
+      renderState.textContent = 'Rendered';
+    } catch (error) {
+      preview.innerHTML = `<div class="alert alert-danger"><strong>Render error</strong><br>${error.message}</div>`;
+      renderState.textContent = 'Error';
+    }
+  }, 250);
+}
+
+document.getElementById('insertStarterBtn').addEventListener('click', () => {
+  const type = diagramTypeSelect.value;
+  if (!sourceInput.value.trim() || confirm('Replace the current source with a starter template?')) {
+    sourceInput.value = starters[type];
+    renderDiagram();
+  }
+});
+
+sourceInput.addEventListener('input', renderDiagram);
+diagramTypeSelect.addEventListener('change', updateHelp);
+
+document.getElementById('assistantToggle').addEventListener('click', () => {
+  const workbench = document.getElementById('editorWorkbench');
+  workbench.classList.toggle('assistant-collapsed');
+  document.getElementById('assistantToggle').textContent = workbench.classList.contains('assistant-collapsed') ? 'Show AI' : 'Hide AI';
+});
+
+document.getElementById('askAssistantBtn').addEventListener('click', async () => {
+  const prompt = document.getElementById('assistantPrompt').value.trim();
+  const model = document.getElementById('modelInput').value.trim();
+  const log = document.getElementById('assistantLog');
+  if (!prompt) return;
+  log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>You</strong><div>${prompt.replace(/</g, '&lt;')}</div></div>`);
+  document.getElementById('assistantPrompt').value = '';
+  log.insertAdjacentHTML('beforeend', `<div class="mb-3 text-muted" id="assistantWorking">Thinking with ${model}...</div>`);
+  log.scrollTop = log.scrollHeight;
+  try {
+    const response = await fetch('{{ url_for("assistant_chat") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, diagram: sourceInput.value })
     });
+    const data = await response.json();
+    document.getElementById('assistantWorking')?.remove();
+    if (!response.ok) throw new Error(data.error || 'Assistant request failed.');
+    log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>${data.model}</strong><pre class="bg-white border rounded p-2 small text-wrap" style="white-space: pre-wrap;">${data.response.replace(/</g, '&lt;')}</pre></div>`);
+  } catch (error) {
+    document.getElementById('assistantWorking')?.remove();
+    log.insertAdjacentHTML('beforeend', `<div class="alert alert-danger small">${error.message}</div>`);
+  }
+  log.scrollTop = log.scrollHeight;
+});
 
-    document.getElementById('visibleUrlInput').addEventListener('input', function () {
-        document.getElementById('hiddenUrlInput').value = this.value;
-    });
+renderDiagram();
 </script>
 {% endblock %}
