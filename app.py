@@ -17,6 +17,9 @@ SUB_DIAGRAM_DIR = DIAGRAM_DIR / "sub_diagrams"
 SAVED_DIAGRAM_DIR = BASE_DIR / "saved_diagrams"
 SAVED_LIBRARY_FILE = SAVED_DIAGRAM_DIR / "saved_links.json"
 FILE_REPOSITORY_DIR = BASE_DIR / "file_repository"
+LLM_CONTEXT_DIR = BASE_DIR / "llm_context"
+STANDARD_INSTRUCTIONS_FILE = LLM_CONTEXT_DIR / "standard_instructions.md"
+MERMAID_DOCUMENTATION_FILE = LLM_CONTEXT_DIR / "mermaid_documentation.md"
 EDITOR_URL = os.environ.get("MERMAID_EDITOR_URL", "http://localhost:9000")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:e2b")
@@ -29,6 +32,7 @@ DIAGRAM_DIR.mkdir(exist_ok=True)
 SUB_DIAGRAM_DIR.mkdir(exist_ok=True)
 SAVED_DIAGRAM_DIR.mkdir(exist_ok=True)
 FILE_REPOSITORY_DIR.mkdir(exist_ok=True)
+LLM_CONTEXT_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "mermaid-final-dev-key")
@@ -188,6 +192,12 @@ def write_json(path, payload):
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
+def read_context_file(path, limit=24000):
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")[:limit]
+
+
 def create_project_folder(name, description=""):
     slug = slugify(name)
     path = project_dir(slug)
@@ -196,6 +206,10 @@ def create_project_folder(name, description=""):
     if not metadata_path.exists():
         write_json(metadata_path, {"name": name, "description": description})
     return slug
+
+
+def ensure_general_project():
+    return create_project_folder("General", "Default project for diagrams saved from Canvas.")
 
 
 def create_repository_revision(project_slug, name, diagram_type, content, source_revision=None):
@@ -208,7 +222,7 @@ def create_repository_revision(project_slug, name, diagram_type, content, source
         metadata_path,
         {
             "name": slugify(Path(name).stem) + ".mmd",
-            "diagram_type": diagram_type if diagram_type in {"master", "sub"} else "master",
+            "diagram_type": diagram_type,
             "active_revision": 0,
         },
     )
@@ -222,7 +236,7 @@ def create_repository_revision(project_slug, name, diagram_type, content, source
     metadata.update(
         {
             "name": metadata.get("name") or slugify(Path(name).stem) + ".mmd",
-            "diagram_type": metadata.get("diagram_type") or diagram_type,
+            "diagram_type": diagram_type or metadata.get("diagram_type"),
             "active_revision": next_revision,
             "source_revision": source_revision,
         }
@@ -397,27 +411,18 @@ def new_canvas():
 @app.route("/save", methods=["POST"])
 def save_diagram():
     source = request.form.get("source", "").strip()
-    url = request.form.get("url", "").strip()
     description = request.form.get("description", "").strip()
     notes = request.form.get("notes", "").strip()
+    diagram_type = request.form.get("diagram_type", "master").strip() or "master"
 
-    if not source and url:
-        try:
-            source = extract_code_from_mermaid_url(url)
-        except Exception:
-            source = ""
     if not source or not description:
         flash("Diagram source and description are required.")
-        return redirect(request.referrer or url_for("library"))
+        return redirect(request.referrer or url_for("canvas"))
 
-    url = convert_mmd_text_to_mermaid_url(source)
-    links = load_saved_links()
-    diagram = SavedLink(id=next_saved_link_id(), url=url, description=description, notes=notes)
-    links.append(diagram)
-    write_saved_links(links)
-    exported = export_url_to_mmd_file(diagram.id, diagram.description, diagram.url)
-    flash("Diagram saved. A local .mmd backup was written." if exported else "Diagram saved. No .mmd backup could be extracted from that URL.")
-    return redirect(request.referrer or url_for("library"))
+    project_slug = ensure_general_project()
+    revision = create_repository_revision(project_slug, description, diagram_type, source)
+    flash(f"{description} saved to File Repository / General as revision {revision}.")
+    return redirect(url_for("repository"))
 
 
 @app.route("/library")
@@ -590,6 +595,12 @@ def assistant_chat():
         return jsonify({"error": "Prompt is required."}), 400
 
     full_prompt = f"""You are helping edit a Mermaid diagram.
+
+Standard instructions:
+{read_context_file(STANDARD_INSTRUCTIONS_FILE)}
+
+Local Mermaid documentation summary:
+{read_context_file(MERMAID_DOCUMENTATION_FILE)}
 
 Current Mermaid diagram:
 ```mermaid

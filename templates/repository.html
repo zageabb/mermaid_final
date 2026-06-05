@@ -43,7 +43,7 @@
                                     </td>
                                     <td>
                                         <span class="badge {{ 'text-bg-success' if diagram.diagram_type == 'master' else 'text-bg-secondary' }}">
-                                            {{ "Master" if diagram.diagram_type == "master" else "Sub diagram" }}
+                                            {% if diagram.diagram_type == "master" %}Master{% elif diagram.diagram_type == "sub" %}Sub diagram{% else %}{{ diagram.diagram_type|title }}{% endif %}
                                         </span>
                                     </td>
                                     <td class="file-path text-truncate">
@@ -91,7 +91,7 @@
                                                     {{ diagram.name }}
                                                     <span class="badge text-bg-secondary ms-2">r{{ diagram.revision }}</span>
                                                 </td>
-                                                <td>{{ "Master" if diagram.diagram_type == "master" else "Sub diagram" }}</td>
+                                                <td>{% if diagram.diagram_type == "master" %}Master{% elif diagram.diagram_type == "sub" %}Sub diagram{% else %}{{ diagram.diagram_type|title }}{% endif %}</td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm" role="group">
                                                         <a class="btn btn-outline-primary" href="{{ url_for('view_file', diagram_id=diagram.id) }}">View</a>

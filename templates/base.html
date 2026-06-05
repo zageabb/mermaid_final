@@ -23,12 +23,16 @@
         .split-handle { background: #e5eaf1; cursor: col-resize; min-width: 6px; }
         .split-handle:hover, .split-handle.dragging { background: #8aa4c7; }
         .source-pane textarea { height: 100%; resize: none; border: 0; border-radius: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9rem; line-height: 1.45; }
-        .preview-surface { height: 100%; overflow: auto; background: #fbfcfe; }
-        .preview-box { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .preview-surface { height: 100%; overflow: hidden; background: #fbfcfe; position: relative; cursor: grab; }
+        .preview-surface.dragging { cursor: grabbing; }
+        .preview-box { min-height: 100%; width: 100%; transform-origin: 0 0; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .preview-tools { position: absolute; top: .75rem; right: .75rem; z-index: 2; }
         .assistant-pane { background: #fff; overflow: hidden; display: flex; flex-direction: column; }
         .assistant-collapsed .assistant-pane { display: none; }
         .assistant-log { flex: 1; overflow: auto; background: #f8fafc; }
-        .help-panel { max-height: 150px; overflow: auto; border-top: 1px solid #dbe1ea; background: #fff; }
+        .help-panel { min-height: 230px; max-height: 260px; overflow: auto; border-top: 1px solid #dbe1ea; background: #fff; }
+        .help-panel code { color: #0f5132; }
+        .help-panel ul { margin-bottom: .5rem; padding-left: 1.1rem; }
         @media (max-width: 992px) {
             .editor-workbench, .editor-workbench.assistant-collapsed { height: auto; min-height: calc(100vh - 105px); display: block; overflow: visible; }
             .split-handle { display: none; }
@@ -47,18 +51,7 @@
         <div class="collapse navbar-collapse" id="mainNav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('canvas') }}">Canvas</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('library') }}">Saved Library</a></li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('repository') }}">File Repository</a></li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Quick Launch ({{ saved_links|length }})</a>
-                    <ul class="dropdown-menu" style="max-height: 400px; overflow-y: auto; min-width: 280px;">
-                        {% for link in saved_links %}
-                            <li><a class="dropdown-item text-truncate" href="{{ url_for('canvas', url=link.url, name=link.description) }}">{{ link.description }}</a></li>
-                        {% else %}
-                            <li><span class="dropdown-item text-muted">No saved diagrams</span></li>
-                        {% endfor %}
-                    </ul>
-                </li>
             </ul>
             <span class="navbar-text small text-light-emphasis">Ollama: {{ ollama_model }}</span>
         </div>
