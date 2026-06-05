@@ -7,6 +7,8 @@ A combined Flask app built from `mermaid_dashboard` and `mermaid-display-app`.
 - Live Mermaid Editor canvas launcher and saved URL library.
 - Built-in live Mermaid editor with source editing and rendered preview.
 - Starter templates and contextual help for common Mermaid diagram types.
+- Draggable source, preview, and AI assistance panes.
+- Repository master previews resolve active `%% INCLUDE` subdocuments.
 - Collapsible AI assistance panel backed by Ollama.
 - File-backed saved diagram links with descriptions and notes.
 - Local `.mmd` backup export from Mermaid Live Editor `pako:` URLs.

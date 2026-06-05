@@ -318,6 +318,16 @@ def find_active_include(project_slug, include_name):
     return None
 
 
+def active_include_sources(project_slug):
+    sources = {}
+    for project in load_projects():
+        if project.slug != project_slug:
+            continue
+        for diagram in project.active_diagrams:
+            sources[diagram.name] = diagram.content
+    return sources
+
+
 def assemble_repository_diagram(diagram, seen=None, is_sub_include=False):
     if seen is None:
         seen = set()
@@ -353,9 +363,12 @@ def canvas():
     save_mode = request.args.get("save_mode", "library")
     repository_diagram_id = request.args.get("repository_diagram_id")
     source = request.args.get("source", "")
+    include_sources = {}
     if save_mode == "repository" and repository_diagram_id:
         try:
-            source = load_repository_diagram(*repository_diagram_id.split("/", 2)).content
+            diagram = load_repository_diagram(*repository_diagram_id.split("/", 2))
+            source = diagram.content
+            include_sources = active_include_sources(diagram.project_slug)
         except Exception:
             source = ""
     elif not source and request.args.get("url"):
@@ -372,6 +385,7 @@ def canvas():
         save_mode=save_mode,
         repository_diagram_id=repository_diagram_id,
         source=source,
+        include_sources=include_sources,
     )
 
 

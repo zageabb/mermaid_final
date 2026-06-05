@@ -34,7 +34,22 @@
 
 <form id="saveForm" action="{{ url_for('update_repository_diagram', diagram_id=repository_diagram_id) if save_mode == 'repository' else url_for('save_diagram') }}" method="POST">
     <input type="hidden" name="url" id="urlInput">
-    <div class="editor-workbench" id="editorWorkbench">
+    {% if save_mode != "repository" %}
+        <div class="bg-white border-bottom px-3 py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="description">Diagram Description</label>
+                    <input type="text" class="form-control form-control-sm" id="description" name="description" value="{{ current_name if current_name != 'New Diagram Canvas' else '' }}" required>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-semibold small" for="notes">Notes</label>
+                    <textarea class="form-control form-control-sm" id="notes" name="notes" rows="1"></textarea>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="editor-workbench {% if save_mode != 'repository' %}has-metadata{% endif %}" id="editorWorkbench">
         <section class="source-pane d-flex flex-column">
             <div class="px-3 py-2 bg-white border-bottom d-flex justify-content-between align-items-center">
                 <strong class="small">Mermaid Source</strong>
@@ -43,6 +58,8 @@
             <textarea class="form-control" id="sourceInput" name="source" spellcheck="false">{{ source }}</textarea>
             <div class="help-panel p-3 small" id="helpPanel"></div>
         </section>
+
+        <div class="split-handle" data-handle="source" title="Drag to resize source and preview panes"></div>
 
         <section class="preview-pane d-flex flex-column">
             <div class="px-3 py-2 bg-white border-bottom d-flex justify-content-between align-items-center">
@@ -53,6 +70,8 @@
                 <div class="preview-box" id="diagramPreview"></div>
             </div>
         </section>
+
+        <div class="split-handle" data-handle="assistant" title="Drag to resize preview and assistant panes"></div>
 
         <aside class="assistant-pane" id="assistantPane">
             <div class="px-3 py-2 border-bottom">
@@ -70,19 +89,6 @@
             </div>
         </aside>
     </div>
-
-    {% if save_mode != "repository" %}
-        <div class="position-fixed bottom-0 start-0 m-3 bg-white border rounded p-3 shadow-sm" style="z-index: 1030; width: min(420px, calc(100vw - 2rem));">
-            <div class="mb-2">
-                <label class="form-label fw-semibold small" for="description">Diagram Description</label>
-                <input type="text" class="form-control form-control-sm" id="description" name="description" value="{{ current_name if current_name != 'New Diagram Canvas' else '' }}" required>
-            </div>
-            <div>
-                <label class="form-label fw-semibold small" for="notes">Notes</label>
-                <textarea class="form-control form-control-sm" id="notes" name="notes" rows="2"></textarea>
-            </div>
-        </div>
-    {% endif %}
 </form>
 {% endblock %}
 
@@ -96,6 +102,9 @@ const detectedType = document.getElementById('detectedType');
 const helpPanel = document.getElementById('helpPanel');
 const diagramTypeSelect = document.getElementById('diagramTypeSelect');
 const urlInput = document.getElementById('urlInput');
+const workbench = document.getElementById('editorWorkbench');
+const includeSources = {{ include_sources | tojson }};
+let selectedHelpType = 'flowchart';
 
 const starters = {
   flowchart: `flowchart TD
@@ -212,10 +221,29 @@ function detectType(source) {
 }
 
 function updateHelp() {
-  const type = detectType(sourceInput.value);
-  detectedType.textContent = type;
-  diagramTypeSelect.value = type;
-  helpPanel.textContent = help[type] || help.flowchart;
+  const detected = detectType(sourceInput.value);
+  detectedType.textContent = detected;
+  helpPanel.textContent = help[selectedHelpType] || help[detected] || help.flowchart;
+}
+
+function syncInitialType() {
+  selectedHelpType = detectType(sourceInput.value);
+  diagramTypeSelect.value = selectedHelpType;
+  updateHelp();
+}
+
+function assembleForPreview(source) {
+  return source.replace(/^(\s*)%%\s*INCLUDE\s+(.+)$/gm, (line, indent, includePath) => {
+    const includeName = includePath.trim().split('/').pop();
+    const includeSource = includeSources[includeName];
+    if (!includeSource) {
+      return `${indent}%% ERROR: Missing include '${includeName}'`;
+    }
+    return includeSource
+      .split('\n')
+      .filter((includeLine) => !/^\s*(erDiagram|flowchart|graph)\b/.test(includeLine))
+      .join('\n');
+  });
 }
 
 function updateUrlSnapshot() {
@@ -237,7 +265,7 @@ async function renderDiagram() {
     try {
       mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'default', maxTextSize: 300000 });
       const id = `diagram-${Date.now()}`;
-      const { svg } = await mermaid.render(id, sourceInput.value);
+      const { svg } = await mermaid.render(id, assembleForPreview(sourceInput.value));
       preview.innerHTML = svg;
       const svgElement = preview.querySelector('svg');
       if (svgElement) {
@@ -262,13 +290,50 @@ document.getElementById('insertStarterBtn').addEventListener('click', () => {
 });
 
 sourceInput.addEventListener('input', renderDiagram);
-diagramTypeSelect.addEventListener('change', updateHelp);
+diagramTypeSelect.addEventListener('change', () => {
+  selectedHelpType = diagramTypeSelect.value;
+  updateHelp();
+});
 
 document.getElementById('assistantToggle').addEventListener('click', () => {
-  const workbench = document.getElementById('editorWorkbench');
   workbench.classList.toggle('assistant-collapsed');
   document.getElementById('assistantToggle').textContent = workbench.classList.contains('assistant-collapsed') ? 'Show AI' : 'Hide AI';
 });
+
+function installSplitHandles() {
+  let activeHandle = null;
+  let startX = 0;
+  let startSourceWidth = 0;
+  let startAssistantWidth = 0;
+  const minSource = 280;
+  const minAssistant = 300;
+
+  document.querySelectorAll('.split-handle').forEach((handle) => {
+    handle.addEventListener('pointerdown', (event) => {
+      activeHandle = handle.dataset.handle;
+      startX = event.clientX;
+      startSourceWidth = document.querySelector('.source-pane').getBoundingClientRect().width;
+      startAssistantWidth = document.querySelector('.assistant-pane').getBoundingClientRect().width;
+      handle.classList.add('dragging');
+      handle.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener('pointermove', (event) => {
+      if (!activeHandle) return;
+      const delta = event.clientX - startX;
+      if (activeHandle === 'source') {
+        workbench.style.setProperty('--source-width', `${Math.max(minSource, startSourceWidth + delta)}px`);
+      }
+      if (activeHandle === 'assistant' && !workbench.classList.contains('assistant-collapsed')) {
+        workbench.style.setProperty('--assistant-width', `${Math.max(minAssistant, startAssistantWidth - delta)}px`);
+      }
+    });
+    handle.addEventListener('pointerup', (event) => {
+      activeHandle = null;
+      handle.classList.remove('dragging');
+      handle.releasePointerCapture(event.pointerId);
+    });
+  });
+}
 
 document.getElementById('askAssistantBtn').addEventListener('click', async () => {
   const prompt = document.getElementById('assistantPrompt').value.trim();
@@ -296,6 +361,8 @@ document.getElementById('askAssistantBtn').addEventListener('click', async () =>
   log.scrollTop = log.scrollHeight;
 });
 
+syncInitialType();
+installSplitHandles();
 renderDiagram();
 </script>
 {% endblock %}
