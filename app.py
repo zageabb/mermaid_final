@@ -198,6 +198,16 @@ def read_context_file(path, limit=24000):
     return path.read_text(encoding="utf-8")[:limit]
 
 
+def normalize_mermaid_source(source):
+    normalized = (source or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.rstrip() for line in normalized.split("\n")]
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines)
+
+
 def create_project_folder(name, description=""):
     slug = slugify(name)
     path = project_dir(slug)
@@ -213,6 +223,7 @@ def ensure_general_project():
 
 
 def create_repository_revision(project_slug, name, diagram_type, content, source_revision=None):
+    content = normalize_mermaid_source(content)
     diagram_slug = slugify(Path(name).stem)
     path = diagram_dir(project_slug, diagram_slug)
     path.mkdir(parents=True, exist_ok=True)
@@ -410,7 +421,7 @@ def new_canvas():
 
 @app.route("/save", methods=["POST"])
 def save_diagram():
-    source = request.form.get("source", "").strip()
+    source = normalize_mermaid_source(request.form.get("source", ""))
     description = request.form.get("description", "").strip()
     notes = request.form.get("notes", "").strip()
     diagram_type = request.form.get("diagram_type", "master").strip() or "master"
@@ -501,7 +512,7 @@ def create_repository_diagram():
     project_slug = request.form.get("project_slug", "").strip()
     name = request.form.get("name", "").strip()
     diagram_type = request.form.get("diagram_type", "master")
-    content = request.form.get("content", "").strip() or DEFAULT_NEW_DIAGRAM
+    content = normalize_mermaid_source(request.form.get("content", "")) or DEFAULT_NEW_DIAGRAM
 
     if not project_slug or not name:
         flash("Project and flowchart name are required.")
@@ -526,7 +537,7 @@ def upload_repository_file():
         return redirect(url_for("repository"))
 
     filename = slugify(Path(uploaded_file.filename).stem) + ".mmd"
-    content = uploaded_file.read().decode("utf-8")
+    content = normalize_mermaid_source(uploaded_file.read().decode("utf-8"))
     revision = create_repository_revision(project_slug, filename, diagram_type, content)
     flash(f"{filename} imported as revision {revision}.")
     return redirect(url_for("repository"))
@@ -560,12 +571,12 @@ def edit_file(diagram_id):
 @app.route("/repository/update/<path:diagram_id>", methods=["POST"])
 def update_repository_diagram(diagram_id):
     diagram = load_repository_diagram(*diagram_id.split("/", 2))
-    source = request.form.get("source", "").strip()
+    source = normalize_mermaid_source(request.form.get("source", ""))
     url = request.form.get("url", "").strip()
 
     if not source and url:
         try:
-            source = extract_code_from_mermaid_url(url)
+            source = normalize_mermaid_source(extract_code_from_mermaid_url(url))
         except Exception as exc:
             flash(f"Could not read Mermaid source from that URL: {exc}")
             return redirect(url_for("repository"))
