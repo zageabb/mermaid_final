@@ -8,7 +8,7 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, stream_with_context, url_for
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -621,12 +621,13 @@ Current Mermaid diagram:
 User request:
 {prompt}
 
-Give a concise answer. If you suggest code, provide a complete Mermaid snippet or a clear patch-style replacement."""
+Give a concise answer. If you suggest code, provide a complete Mermaid snippet or a clear patch-style replacement.
+Do not reveal private chain-of-thought or output <think> blocks. If reasoning is useful, provide a brief visible summary only."""
     request_payload = json.dumps(
         {
             "model": model,
             "prompt": full_prompt,
-            "stream": False,
+            "stream": True,
         }
     ).encode("utf-8")
     request_obj = urllib.request.Request(
@@ -636,23 +637,44 @@ Give a concise answer. If you suggest code, provide a complete Mermaid snippet o
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(request_obj, timeout=120) as response:
-            result = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        error_body = exc.read().decode("utf-8", errors="replace")[:500]
-        return jsonify({"error": f"Ollama returned HTTP {exc.code}: {error_body or exc.reason}"}), 502
-    except urllib.error.URLError as exc:
-        return jsonify({"error": f"Could not reach Ollama at {OLLAMA_URL}: {exc.reason}"}), 502
-    except TimeoutError:
-        return jsonify({"error": f"Ollama timed out at {OLLAMA_URL}."}), 504
-    except json.JSONDecodeError:
-        return jsonify({"error": "Ollama returned an unreadable response."}), 502
-    except Exception as exc:
-        app.logger.exception("Assistant request failed")
-        return jsonify({"error": f"Assistant request failed: {exc}"}), 500
+    def stream_response():
+        def event(payload):
+            return json.dumps(payload) + "\n"
 
-    return jsonify({"response": result.get("response", ""), "model": model})
+        yield event({"type": "status", "message": f"Contacting Ollama at {OLLAMA_URL}"})
+        try:
+            with urllib.request.urlopen(request_obj, timeout=120) as response:
+                yield event({"type": "status", "message": f"Streaming response from {model}"})
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line:
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        yield event({"type": "error", "message": "Ollama returned an unreadable stream chunk."})
+                        return
+                    if chunk.get("response"):
+                        yield event({"type": "token", "text": chunk["response"]})
+                    if chunk.get("done"):
+                        yield event({"type": "done", "model": model})
+                        return
+        except urllib.error.HTTPError as exc:
+            error_body = exc.read().decode("utf-8", errors="replace")[:500]
+            yield event({"type": "error", "message": f"Ollama returned HTTP {exc.code}: {error_body or exc.reason}"})
+        except urllib.error.URLError as exc:
+            yield event({"type": "error", "message": f"Could not reach Ollama at {OLLAMA_URL}: {exc.reason}"})
+        except TimeoutError:
+            yield event({"type": "error", "message": f"Ollama timed out at {OLLAMA_URL}."})
+        except Exception as exc:
+            app.logger.exception("Assistant request failed")
+            yield event({"type": "error", "message": f"Assistant request failed: {exc}"})
+
+    return Response(
+        stream_with_context(stream_response()),
+        mimetype="application/x-ndjson",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.route("/repository/export/<path:diagram_id>")
