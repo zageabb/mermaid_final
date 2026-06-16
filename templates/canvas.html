@@ -56,7 +56,7 @@
                 <strong class="small">Mermaid Source</strong>
                 <span class="small text-muted" id="detectedType">flowchart</span>
             </div>
-            <textarea class="form-control" id="sourceInput" name="source" spellcheck="false">{{ source }}</textarea>
+            <textarea class="form-control" id="sourceInput" name="source" spellcheck="false">{{ source | trim }}</textarea>
             <div class="help-panel p-3 small" id="helpPanel"></div>
         </section>
 
@@ -219,6 +219,39 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function formatAssistantText(text) {
+  return escapeHtml(text)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+function formatAssistantResponse(text) {
+  const parts = [];
+  const fencePattern = /```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g;
+  let cursor = 0;
+  let match;
+
+  while ((match = fencePattern.exec(text)) !== null) {
+    if (match.index > cursor) {
+      parts.push(formatAssistantText(text.slice(cursor, match.index).trim()));
+    }
+    const language = match[1] || 'code';
+    const code = match[2].replace(/^\n+|\n+$/g, '');
+    parts.push(`
+      <div class="assistant-code-label">${escapeHtml(language)}</div>
+      <pre class="assistant-code"><code>${escapeHtml(code)}</code></pre>
+    `);
+    cursor = fencePattern.lastIndex;
+  }
+
+  if (cursor < text.length) {
+    parts.push(formatAssistantText(text.slice(cursor).trim()));
+  }
+
+  return parts.filter(Boolean).join('');
 }
 
 function detectType(source) {
@@ -441,7 +474,7 @@ document.getElementById('askAssistantBtn').addEventListener('click', async () =>
     }
     document.getElementById('assistantWorking')?.remove();
     if (!response.ok) throw new Error(data.error || 'Assistant request failed.');
-    log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>${escapeHtml(data.model || model)}</strong><pre class="bg-white border rounded p-2 small text-wrap" style="white-space: pre-wrap;">${escapeHtml(data.response || '')}</pre></div>`);
+    log.insertAdjacentHTML('beforeend', `<div class="mb-3"><strong>${escapeHtml(data.model || model)}</strong><div class="assistant-message mt-1">${formatAssistantResponse(data.response || '')}</div></div>`);
   } catch (error) {
     document.getElementById('assistantWorking')?.remove();
     log.insertAdjacentHTML('beforeend', `<div class="alert alert-danger small">${escapeHtml(error.message)}</div>`);
