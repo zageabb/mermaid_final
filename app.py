@@ -208,6 +208,25 @@ def normalize_mermaid_source(source):
     return "\n".join(lines)
 
 
+def has_mermaid_declaration(source):
+    return bool(
+        re.match(
+            r"^\s*(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|quadrantChart|mindmap|timeline|gitGraph|requirementDiagram|C4)",
+            source or "",
+        )
+    )
+
+
+def preview_prefix_for_diagram(diagram):
+    if diagram.diagram_type == "sub" and not has_mermaid_declaration(diagram.content):
+        return "flowchart TB\n"
+    return ""
+
+
+def renderable_repository_content(diagram):
+    return preview_prefix_for_diagram(diagram) + assemble_repository_diagram(diagram)
+
+
 def create_project_folder(name, description=""):
     slug = slugify(name)
     path = project_dir(slug)
@@ -389,10 +408,12 @@ def canvas():
     repository_diagram_id = request.args.get("repository_diagram_id")
     source = request.args.get("source", "")
     include_sources = {}
+    preview_prefix = ""
     if save_mode == "repository" and repository_diagram_id:
         try:
             diagram = load_repository_diagram(*repository_diagram_id.split("/", 2))
             source = diagram.content
+            preview_prefix = preview_prefix_for_diagram(diagram)
             include_sources = active_include_sources(diagram.project_slug)
         except Exception:
             source = ""
@@ -411,6 +432,7 @@ def canvas():
         repository_diagram_id=repository_diagram_id,
         source=source,
         include_sources=include_sources,
+        preview_prefix=preview_prefix,
     )
 
 
@@ -546,7 +568,7 @@ def upload_repository_file():
 @app.route("/repository/view/<path:diagram_id>")
 def view_file(diagram_id):
     diagram = load_repository_diagram(*diagram_id.split("/", 2))
-    content = assemble_repository_diagram(diagram)
+    content = renderable_repository_content(diagram)
     return render_template(
         "view.html",
         filename=f"{diagram.project_slug}/{diagram.name}",

@@ -111,6 +111,7 @@ const urlInput = document.getElementById('urlInput');
 const diagramTypeInput = document.getElementById('diagramTypeInput');
 const workbench = document.getElementById('editorWorkbench');
 const includeSources = {{ include_sources | tojson }};
+const previewPrefix = {{ preview_prefix | tojson }};
 let selectedHelpType = 'flowchart';
 let previewScale = 1;
 let previewPanX = 0;
@@ -286,7 +287,7 @@ function syncInitialType() {
 }
 
 function assembleForPreview(source) {
-  return source.replace(/^(\s*)%%\s*INCLUDE\s+(.+)$/gm, (line, indent, includePath) => {
+  const assembled = source.replace(/^(\s*)%%\s*INCLUDE\s+(.+)$/gm, (line, indent, includePath) => {
     const includeName = includePath.trim().split('/').pop();
     const includeSource = includeSources[includeName];
     if (!includeSource) {
@@ -297,6 +298,7 @@ function assembleForPreview(source) {
       .filter((includeLine) => !/^\s*(erDiagram|flowchart|graph)\b/.test(includeLine))
       .join('\n');
   });
+  return `${previewPrefix}${assembled}`;
 }
 
 function updateUrlSnapshot() {
