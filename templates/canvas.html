@@ -303,7 +303,13 @@ function assembleForPreview(source) {
 
 function updateUrlSnapshot() {
   try {
-    const state = { code: sourceInput.value, mermaid: '{"theme":"default"}', autoSync: true, updateDiagram: true, updateEditor: true };
+    const state = {
+      code: sourceInput.value,
+      mermaid: JSON.stringify({ theme: {{ mermaid_theme | tojson }} }),
+      autoSync: {{ live_editor_state.autoSync | tojson }},
+      updateDiagram: {{ live_editor_state.updateDiagram | tojson }},
+      updateEditor: {{ live_editor_state.updateEditor | tojson }}
+    };
     urlInput.value = `local-editor:${btoa(unescape(encodeURIComponent(JSON.stringify(state))))}`;
   } catch (error) {
     urlInput.value = '';
@@ -318,7 +324,7 @@ async function renderDiagram() {
     updateUrlSnapshot();
     renderState.textContent = 'Rendering';
     try {
-      mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'default', maxTextSize: 300000 });
+      mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: {{ mermaid_theme | tojson }}, maxTextSize: {{ mermaid_canvas_max_text_size | tojson }} });
       const id = `diagram-${Date.now()}`;
       const { svg } = await mermaid.render(id, assembleForPreview(sourceInput.value));
       preview.innerHTML = svg;

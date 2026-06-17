@@ -12,21 +12,46 @@ from flask import Flask, Response, abort, flash, jsonify, redirect, render_templ
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DIAGRAM_DIR = BASE_DIR / "diagrams"
-SUB_DIAGRAM_DIR = DIAGRAM_DIR / "sub_diagrams"
-SAVED_DIAGRAM_DIR = BASE_DIR / "saved_diagrams"
-SAVED_LIBRARY_FILE = SAVED_DIAGRAM_DIR / "saved_links.json"
-FILE_REPOSITORY_DIR = BASE_DIR / "file_repository"
-LLM_CONTEXT_DIR = BASE_DIR / "llm_context"
-STANDARD_INSTRUCTIONS_FILE = LLM_CONTEXT_DIR / "standard_instructions.md"
-MERMAID_DOCUMENTATION_FILE = LLM_CONTEXT_DIR / "mermaid_documentation.md"
-EDITOR_URL = os.environ.get("MERMAID_EDITOR_URL", "http://localhost:9000")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.1.249:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4:e2b")
-APP_PORT = int(os.environ.get("PORT", "5013"))
-DEFAULT_NEW_DIAGRAM = """flowchart TD
-    Start[New diagram] --> Next[Edit me in Mermaid]
-"""
+CONFIG_FILE = BASE_DIR / "config.json"
+
+
+def load_config():
+    if not CONFIG_FILE.exists():
+        raise RuntimeError(f"Missing required config file: {CONFIG_FILE}")
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Could not parse {CONFIG_FILE}: {exc}") from exc
+
+
+CONFIG = load_config()
+DIAGRAM_DIR = BASE_DIR / CONFIG["paths"]["diagram_dir"]
+SUB_DIAGRAM_DIR = BASE_DIR / CONFIG["paths"]["sub_diagram_dir"]
+SAVED_DIAGRAM_DIR = BASE_DIR / CONFIG["paths"]["saved_diagram_dir"]
+SAVED_LIBRARY_FILE = BASE_DIR / CONFIG["paths"]["saved_library_file"]
+FILE_REPOSITORY_DIR = BASE_DIR / CONFIG["paths"]["file_repository_dir"]
+LLM_CONTEXT_DIR = BASE_DIR / CONFIG["paths"]["llm_context_dir"]
+STANDARD_INSTRUCTIONS_FILE = BASE_DIR / CONFIG["paths"]["standard_instructions_file"]
+MERMAID_DOCUMENTATION_FILE = BASE_DIR / CONFIG["paths"]["mermaid_documentation_file"]
+EDITOR_URL = os.environ.get("MERMAID_EDITOR_URL", CONFIG["mermaid"]["editor_url"])
+OLLAMA_URL = os.environ.get("OLLAMA_URL", CONFIG["llm"]["url"])
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", CONFIG["llm"]["default_model"])
+OLLAMA_GENERATE_ENDPOINT = CONFIG["llm"]["generate_endpoint"]
+OLLAMA_REQUEST_TIMEOUT = int(CONFIG["llm"]["request_timeout_seconds"])
+APP_HOST = CONFIG["app"]["host"]
+APP_PORT = int(os.environ.get("PORT", CONFIG["app"]["port"]))
+APP_DEBUG = bool(CONFIG["app"]["debug"])
+DEFAULT_NEW_DIAGRAM = CONFIG["mermaid"]["default_new_diagram"]
+MERMAID_THEME = CONFIG["mermaid"]["theme"]
+MERMAID_CANVAS_MAX_TEXT_SIZE = int(CONFIG["mermaid"]["canvas_max_text_size"])
+MERMAID_VIEW_MAX_TEXT_SIZE = int(CONFIG["mermaid"]["view_max_text_size"])
+FRAGMENT_SUBDIAGRAM_PREFIX = CONFIG["mermaid"]["fragment_subdiagram_prefix"]
+LIVE_EDITOR_STATE = CONFIG["live_editor_state"]
+LLM_CONTEXT_FILE_LIMIT = int(CONFIG["llm"]["context_file_limit"])
+LLM_CHAT_STREAM = bool(CONFIG["llm"]["chat_stream"])
+LLM_KEEPALIVE_STREAM = bool(CONFIG["llm"]["keepalive_stream"])
+LLM_KEEPALIVE = CONFIG["llm"]["keepalive"]
+PROMPTS = CONFIG["prompts"]
 
 DIAGRAM_DIR.mkdir(exist_ok=True)
 SUB_DIAGRAM_DIR.mkdir(exist_ok=True)
@@ -35,7 +60,7 @@ FILE_REPOSITORY_DIR.mkdir(exist_ok=True)
 LLM_CONTEXT_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "mermaid-final-dev-key")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", CONFIG["app"]["secret_key"])
 
 # Database access is intentionally disabled. The app now stores the saved library
 # in saved_diagrams/saved_links.json and the repository in file_repository/.
@@ -77,7 +102,15 @@ class ProjectFolder:
 
 @app.context_processor
 def inject_saved_links():
-    return {"saved_links": load_saved_links(), "editor_url": EDITOR_URL, "ollama_model": OLLAMA_MODEL}
+    return {
+        "saved_links": load_saved_links(),
+        "editor_url": EDITOR_URL,
+        "ollama_model": OLLAMA_MODEL,
+        "mermaid_theme": MERMAID_THEME,
+        "mermaid_canvas_max_text_size": MERMAID_CANVAS_MAX_TEXT_SIZE,
+        "mermaid_view_max_text_size": MERMAID_VIEW_MAX_TEXT_SIZE,
+        "live_editor_state": LIVE_EDITOR_STATE,
+    }
 
 
 def slugify(text):
@@ -111,10 +144,10 @@ def extract_code_from_mermaid_url(url_string):
 def convert_mmd_text_to_mermaid_url(mmd_text):
     state = {
         "code": mmd_text.strip(),
-        "mermaid": '{"theme":"default"}',
-        "autoSync": True,
-        "updateDiagram": True,
-        "updateEditor": True,
+        "mermaid": json.dumps({"theme": MERMAID_THEME}),
+        "autoSync": bool(LIVE_EDITOR_STATE["autoSync"]),
+        "updateDiagram": bool(LIVE_EDITOR_STATE["updateDiagram"]),
+        "updateEditor": bool(LIVE_EDITOR_STATE["updateEditor"]),
     }
     json_bytes = json.dumps(state, ensure_ascii=False).encode("utf-8")
     compressed = zlib.compress(json_bytes, level=9)
@@ -192,9 +225,10 @@ def write_json(path, payload):
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def read_context_file(path, limit=24000):
+def read_context_file(path, limit=None):
     if not path.exists():
         return ""
+    limit = LLM_CONTEXT_FILE_LIMIT if limit is None else limit
     return path.read_text(encoding="utf-8")[:limit]
 
 
@@ -219,7 +253,7 @@ def has_mermaid_declaration(source):
 
 def preview_prefix_for_diagram(diagram):
     if diagram.diagram_type == "sub" and not has_mermaid_declaration(diagram.content):
-        return "flowchart TB\n"
+        return FRAGMENT_SUBDIAGRAM_PREFIX
     return ""
 
 
@@ -627,7 +661,7 @@ def assistant_chat():
     if not prompt:
         return jsonify({"error": "Prompt is required."}), 400
 
-    full_prompt = f"""You are helping edit a Mermaid diagram.
+    full_prompt = f"""{PROMPTS["chat_system_prefix"]}
 
 Standard instructions:
 {read_context_file(STANDARD_INSTRUCTIONS_FILE)}
@@ -643,17 +677,17 @@ Current Mermaid diagram:
 User request:
 {prompt}
 
-Give a concise answer. If you suggest code, provide a complete Mermaid snippet or a clear patch-style replacement.
-Do not reveal private chain-of-thought or output <think> blocks. If reasoning is useful, provide a brief visible summary only."""
+{PROMPTS["chat_response_rules"]}
+{PROMPTS["no_chain_of_thought"]}"""
     request_payload = json.dumps(
         {
             "model": model,
             "prompt": full_prompt,
-            "stream": True,
+            "stream": LLM_CHAT_STREAM,
         }
     ).encode("utf-8")
     request_obj = urllib.request.Request(
-        f"{OLLAMA_URL}/api/generate",
+        f"{OLLAMA_URL}{OLLAMA_GENERATE_ENDPOINT}",
         data=request_payload,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -665,22 +699,27 @@ Do not reveal private chain-of-thought or output <think> blocks. If reasoning is
 
         yield event({"type": "status", "message": f"Contacting Ollama at {OLLAMA_URL}"})
         try:
-            with urllib.request.urlopen(request_obj, timeout=120) as response:
+            with urllib.request.urlopen(request_obj, timeout=OLLAMA_REQUEST_TIMEOUT) as response:
                 yield event({"type": "status", "message": f"Streaming response from {model}"})
-                for raw_line in response:
-                    line = raw_line.decode("utf-8", errors="replace").strip()
-                    if not line:
-                        continue
-                    try:
-                        chunk = json.loads(line)
-                    except json.JSONDecodeError:
-                        yield event({"type": "error", "message": "Ollama returned an unreadable stream chunk."})
-                        return
-                    if chunk.get("response"):
-                        yield event({"type": "token", "text": chunk["response"]})
-                    if chunk.get("done"):
-                        yield event({"type": "done", "model": model})
-                        return
+                if LLM_CHAT_STREAM:
+                    for raw_line in response:
+                        line = raw_line.decode("utf-8", errors="replace").strip()
+                        if not line:
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                        except json.JSONDecodeError:
+                            yield event({"type": "error", "message": "Ollama returned an unreadable stream chunk."})
+                            return
+                        if chunk.get("response"):
+                            yield event({"type": "token", "text": chunk["response"]})
+                        if chunk.get("done"):
+                            yield event({"type": "done", "model": model})
+                            return
+                else:
+                    result = json.loads(response.read().decode("utf-8") or "{}")
+                    yield event({"type": "token", "text": result.get("response", "")})
+                    yield event({"type": "done", "model": model})
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode("utf-8", errors="replace")[:500]
             yield event({"type": "error", "message": f"Ollama returned HTTP {exc.code}: {error_body or exc.reason}"})
@@ -707,20 +746,30 @@ def assistant_keepalive():
         {
             "model": model,
             "prompt": "",
-            "stream": False,
-            "keep_alive": "1h",
+            "stream": LLM_KEEPALIVE_STREAM,
+            "keep_alive": LLM_KEEPALIVE,
         }
     ).encode("utf-8")
     request_obj = urllib.request.Request(
-        f"{OLLAMA_URL}/api/generate",
+        f"{OLLAMA_URL}{OLLAMA_GENERATE_ENDPOINT}",
         data=request_payload,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
 
     try:
-        with urllib.request.urlopen(request_obj, timeout=120) as response:
-            result = json.loads(response.read().decode("utf-8") or "{}")
+        with urllib.request.urlopen(request_obj, timeout=OLLAMA_REQUEST_TIMEOUT) as response:
+            if LLM_KEEPALIVE_STREAM:
+                result = {}
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line:
+                        continue
+                    result = json.loads(line)
+                    if result.get("done"):
+                        break
+            else:
+                result = json.loads(response.read().decode("utf-8") or "{}")
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace")[:500]
         return jsonify({"error": f"Ollama returned HTTP {exc.code}: {error_body or exc.reason}"}), 502
@@ -738,7 +787,7 @@ def assistant_keepalive():
         {
             "ok": True,
             "model": model,
-            "keep_alive": "1h",
+            "keep_alive": LLM_KEEPALIVE,
             "done": result.get("done", False),
         }
     )
@@ -758,4 +807,4 @@ def export_repository_diagram(diagram_id):
 
 if __name__ == "__main__":
     seed_file_repository_from_legacy_files()
-    app.run(host="0.0.0.0", port=APP_PORT, debug=True)
+    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)

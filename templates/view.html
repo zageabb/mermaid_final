@@ -28,7 +28,7 @@
     </main>
     <script>
         const diagramText = {{ content | tojson }};
-        mermaid.initialize({ startOnLoad: false, theme: 'default', maxTextSize: 200000 });
+        mermaid.initialize({ startOnLoad: false, theme: {{ mermaid_theme | tojson }}, maxTextSize: {{ mermaid_view_max_text_size | tojson }} });
 
         async function renderDiagram() {
             const container = document.getElementById('diagram-container');

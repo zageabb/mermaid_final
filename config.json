@@ -1,0 +1,46 @@
+{
+  "app": {
+    "host": "0.0.0.0",
+    "port": 5013,
+    "debug": true,
+    "secret_key": "mermaid-final-dev-key"
+  },
+  "paths": {
+    "diagram_dir": "diagrams",
+    "sub_diagram_dir": "diagrams/sub_diagrams",
+    "saved_diagram_dir": "saved_diagrams",
+    "saved_library_file": "saved_diagrams/saved_links.json",
+    "file_repository_dir": "file_repository",
+    "llm_context_dir": "llm_context",
+    "standard_instructions_file": "llm_context/standard_instructions.md",
+    "mermaid_documentation_file": "llm_context/mermaid_documentation.md"
+  },
+  "mermaid": {
+    "editor_url": "http://localhost:9000",
+    "theme": "default",
+    "canvas_max_text_size": 300000,
+    "view_max_text_size": 200000,
+    "fragment_subdiagram_prefix": "flowchart TB\n",
+    "default_new_diagram": "flowchart TD\n    Start[New diagram] --> Next[Edit me in Mermaid]\n"
+  },
+  "live_editor_state": {
+    "autoSync": true,
+    "updateDiagram": true,
+    "updateEditor": true
+  },
+  "llm": {
+    "url": "http://192.168.1.249:11434",
+    "default_model": "gemma4:e2b",
+    "generate_endpoint": "/api/generate",
+    "request_timeout_seconds": 120,
+    "chat_stream": true,
+    "keepalive_stream": false,
+    "keepalive": "1h",
+    "context_file_limit": 24000
+  },
+  "prompts": {
+    "chat_system_prefix": "You are helping edit a Mermaid diagram.",
+    "chat_response_rules": "Give a concise answer. If you suggest code, provide a complete Mermaid snippet or a clear patch-style replacement.",
+    "no_chain_of_thought": "Do not reveal private chain-of-thought or output <think> blocks. If reasoning is useful, provide a brief visible summary only."
+  }
+}
