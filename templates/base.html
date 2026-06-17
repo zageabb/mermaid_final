@@ -75,6 +75,18 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            fetch('{{ url_for("assistant_keepalive") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: {{ ollama_model | tojson }} }),
+                keepalive: true
+            }).catch((error) => {
+                console.warn('Assistant keepalive failed:', error);
+            });
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

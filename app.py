@@ -677,6 +677,51 @@ Do not reveal private chain-of-thought or output <think> blocks. If reasoning is
     )
 
 
+@app.route("/assistant/keepalive", methods=["POST"])
+def assistant_keepalive():
+    payload = request.get_json(silent=True) or {}
+    model = (payload.get("model") or OLLAMA_MODEL).strip()
+    request_payload = json.dumps(
+        {
+            "model": model,
+            "prompt": "",
+            "stream": False,
+            "keep_alive": "1h",
+        }
+    ).encode("utf-8")
+    request_obj = urllib.request.Request(
+        f"{OLLAMA_URL}/api/generate",
+        data=request_payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request_obj, timeout=120) as response:
+            result = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")[:500]
+        return jsonify({"error": f"Ollama returned HTTP {exc.code}: {error_body or exc.reason}"}), 502
+    except urllib.error.URLError as exc:
+        return jsonify({"error": f"Could not reach Ollama at {OLLAMA_URL}: {exc.reason}"}), 502
+    except TimeoutError:
+        return jsonify({"error": f"Ollama timed out at {OLLAMA_URL}."}), 504
+    except json.JSONDecodeError:
+        return jsonify({"error": "Ollama returned an unreadable keepalive response."}), 502
+    except Exception as exc:
+        app.logger.exception("Assistant keepalive failed")
+        return jsonify({"error": f"Assistant keepalive failed: {exc}"}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "model": model,
+            "keep_alive": "1h",
+            "done": result.get("done", False),
+        }
+    )
+
+
 @app.route("/repository/export/<path:diagram_id>")
 def export_repository_diagram(diagram_id):
     diagram = load_repository_diagram(*diagram_id.split("/", 2))
