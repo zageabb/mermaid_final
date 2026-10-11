@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, stream_with_context, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -60,6 +61,10 @@ FILE_REPOSITORY_DIR.mkdir(exist_ok=True)
 LLM_CONTEXT_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
+# UDA/Caddy supplies the public scheme, host, and application prefix. Keep the
+# client address untouched so a forwarded address cannot disguise direct LAN
+# traffic as a request from the local proxy.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=0, x_proto=1, x_host=1, x_prefix=1)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", CONFIG["app"]["secret_key"])
 
 # Database access is intentionally disabled. The app now stores the saved library
