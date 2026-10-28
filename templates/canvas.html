@@ -7,6 +7,8 @@
         <h1 class="h5 mb-0 text-truncate" id="activeWorkspaceTitle">{{ current_name }}</h1>
     </div>
     <div class="d-flex flex-wrap toolbar">
+        <button class="btn btn-outline-success btn-sm" type="button" id="download-svg" disabled>Export SVG</button>
+        <button class="btn btn-outline-success btn-sm" type="button" id="download-png" disabled>Export PNG</button>
         <select class="form-select form-select-sm" id="diagramTypeSelect" style="width: 190px;" aria-label="Diagram type">
             <option value="flowchart">Flowchart</option>
             <option value="sequence">Sequence</option>
@@ -100,6 +102,7 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="{{ url_for('static', filename='diagram_export.js') }}"></script>
 <script>
 const sourceInput = document.getElementById('sourceInput');
 const preview = document.getElementById('diagramPreview');
@@ -113,6 +116,7 @@ const workbench = document.getElementById('editorWorkbench');
 const includeSources = {{ include_sources | tojson }};
 const previewPrefix = {{ preview_prefix | tojson }};
 let selectedHelpType = 'flowchart';
+let exportSvg = null;
 let previewScale = 1;
 let previewPanX = 0;
 let previewPanY = 0;
@@ -318,6 +322,9 @@ function updateUrlSnapshot() {
 
 let renderTimer;
 async function renderDiagram() {
+  exportSvg = null;
+  document.getElementById("download-svg").disabled = true;
+  document.getElementById("download-png").disabled = true;
   clearTimeout(renderTimer);
   renderTimer = setTimeout(async () => {
     updateHelp();
@@ -328,6 +335,9 @@ async function renderDiagram() {
       const id = `diagram-${Date.now()}`;
       const { svg } = await mermaid.render(id, assembleForPreview(sourceInput.value));
       preview.innerHTML = svg;
+      exportSvg = svg;
+      document.getElementById("download-svg").disabled = false;
+      document.getElementById("download-png").disabled = false;
       const svgElement = preview.querySelector('svg');
       if (svgElement) {
         svgElement.style.maxWidth = 'none';
@@ -341,6 +351,20 @@ async function renderDiagram() {
       renderState.textContent = 'Error';
     }
   }, 250);
+}
+
+for (const format of ['svg', 'png']) {
+  const button = document.getElementById('download-' + format);
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      await DiagramExport.download(exportSvg, format, document.getElementById('activeWorkspaceTitle').textContent);
+    } catch (error) {
+      window.alert('Diagram export failed: ' + error.message);
+    } finally {
+      button.disabled = !exportSvg;
+    }
+  });
 }
 
 document.getElementById('insertStarterBtn').addEventListener('click', () => {
