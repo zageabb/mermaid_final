@@ -74,6 +74,7 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
                             <li><button class="dropdown-item" type="button" id="download-svg" disabled>SVG (vector)</button></li>
                             <li><button class="dropdown-item" type="button" id="download-png" disabled>PNG (image)</button></li>
+                            <li><button class="dropdown-item" type="button" id="download-pptx" disabled>PowerPoint (editable)</button></li>
                         </ul>
                     </div>
                 </div>
@@ -126,6 +127,7 @@ const includeSources = {{ include_sources | tojson }};
 const previewPrefix = {{ preview_prefix | tojson }};
 let selectedHelpType = 'flowchart';
 let exportSvg = null;
+let exportMermaidSource = null;
 let previewScale = 1;
 let previewPanX = 0;
 let previewPanY = 0;
@@ -332,6 +334,8 @@ function updateUrlSnapshot() {
 let renderTimer;
 async function renderDiagram() {
   exportSvg = null;
+  exportMermaidSource = null;
+  document.getElementById("download-pptx").disabled = true;
   document.getElementById("download-svg").disabled = true;
   document.getElementById("download-png").disabled = true;
   document.getElementById("exportDropdown").disabled = true;
@@ -343,9 +347,12 @@ async function renderDiagram() {
     try {
       mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: {{ mermaid_theme | tojson }}, maxTextSize: {{ mermaid_canvas_max_text_size | tojson }} });
       const id = `diagram-${Date.now()}`;
-      const { svg } = await mermaid.render(id, assembleForPreview(sourceInput.value));
+      const assembledSource = assembleForPreview(sourceInput.value);
+      const { svg } = await mermaid.render(id, assembledSource);
       preview.innerHTML = svg;
       exportSvg = svg;
+      exportMermaidSource = assembledSource;
+      document.getElementById("download-pptx").disabled = false;
       document.getElementById("download-svg").disabled = false;
       document.getElementById("download-png").disabled = false;
       document.getElementById("exportDropdown").disabled = false;
@@ -363,6 +370,40 @@ async function renderDiagram() {
     }
   }, 250);
 }
+
+document.getElementById('download-pptx').addEventListener('click', async () => {
+  const button = document.getElementById('download-pptx');
+  if (!exportMermaidSource) return;
+  button.disabled = true;
+  try {
+    const filename = document.getElementById('activeWorkspaceTitle').textContent.trim() || 'diagram';
+    const response = await fetch({{ url_for('export_canvas_pptx') | tojson }}, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: exportMermaidSource, filename })
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).match(/<p>(.*?)<\/p>/s)?.[1] || response.statusText;
+      throw new Error('HTTP ' + response.status + ': ' + detail.replace(/<[^>]+>/g, ''));
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const serverName = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+    const name = serverName || (filename.replace(/[^a-zA-Z0-9_-]+/g, '_') + '.pptx');
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 10000);
+  } catch (error) {
+    window.alert('Editable PowerPoint export failed: ' + error.message);
+  } finally {
+    button.disabled = !exportMermaidSource;
+  }
+});
 
 for (const format of ['svg', 'png']) {
   const button = document.getElementById('download-' + format);
