@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from app import app
 
@@ -48,11 +49,13 @@ def test_unsaved_canvas_powerpoint_export_has_editable_shapes():
     assert 'Internal_Supplier_Access.pptx' in response.headers["Content-Disposition"]
     deck = Presentation(io.BytesIO(response.data))
     assert len(deck.slides) == 1
-    assert len(deck.slides[0].shapes) >= 2, [
-        (str(shape.shape_type), shape.name, getattr(shape, "text", ""),
-         len(shape.shapes) if hasattr(shape, "shapes") else 0)
-        for shape in deck.slides[0].shapes
-    ]
+    assert len(deck.slides[0].shapes) == 1
+    group = deck.slides[0].shapes[0]
+    # diagram-pptx deliberately groups editable shapes in one top-level object.
+    assert group.shape_type == MSO_SHAPE_TYPE.GROUP
+    assert len(group.shapes) >= 2
+    assert any(shape.has_text_frame for shape in group.shapes)
+    assert all(shape.shape_type != MSO_SHAPE_TYPE.PICTURE for shape in group.shapes)
 
 
 def test_saved_repository_powerpoint_download_uses_assembled_source():
