@@ -21,6 +21,9 @@
             <button class="btn btn-success btn-sm" id="download-svg" type="button" disabled>Export SVG</button>
             <button class="btn btn-success btn-sm" id="download-png" type="button" disabled>Export PNG</button>
             {% if diagram_id is defined %}
+                <a class="btn btn-success btn-sm" href="{{ url_for('export_repository_pptx', diagram_id=diagram_id) }}">Export editable PPTX</a>
+            {% endif %}
+            {% if diagram_id is defined %}
                 <a class="btn btn-outline-light btn-sm" href="{{ url_for('edit_file', diagram_id=diagram_id) }}">Edit in Canvas</a>
             {% endif %}
             <a class="btn btn-warning btn-sm" href="{{ url_for('repository') }}">Repository</a>
