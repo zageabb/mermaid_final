@@ -42,6 +42,8 @@ A combined Flask app built from `mermaid_dashboard` and `mermaid-display-app`.
 - Recursive `%% INCLUDE sub_diagrams/name.mmd` rendering within each project.
 - Mermaid canvas editing for repository diagrams.
 - Per-diagram `.mmd` export from repository files.
+- SVG and high-resolution PNG image export from Canvas and the repository viewer.
+- Editable PowerPoint (.pptx) export from the Preview dropdown (including unsaved Canvas work) and the repository viewer, using diagram-pptx native shapes on a 16:9 slide. Supported flowcharts, sequence, class, ER, and state diagrams are editable rather than bitmap screenshots; other diagram families may not be supported by the native renderer.
 - Automatic repository revisions: saving from Canvas creates a new active revision file and leaves the old one inactive.
 - LLM context files in `llm_context/standard_instructions.md` and `llm_context/mermaid_documentation.md`.
 - Official Mermaid documentation snapshots stored in `llm_context/official_mermaid_docs/`.

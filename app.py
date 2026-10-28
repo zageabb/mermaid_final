@@ -8,7 +8,8 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, stream_with_context, url_for
+from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, send_file, stream_with_context, url_for
+from pptx_export import build_powerpoint
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 
@@ -796,6 +797,50 @@ def assistant_keepalive():
             "done": result.get("done", False),
         }
     )
+
+
+PPTX_MIMETYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+
+def send_editable_pptx(source, filename):
+    """Build a downloadable PPTX from complete Mermaid text, without saving a revision."""
+    source = normalize_mermaid_source(source)
+    if not source:
+        abort(400, description="Cannot export an empty diagram.")
+    if len(source) > MERMAID_CANVAS_MAX_TEXT_SIZE:
+        abort(413, description="The diagram is too large for PowerPoint export.")
+    try:
+        result = build_powerpoint(source)
+    except Exception as exc:
+        app.logger.warning("Editable PowerPoint export failed: %s", exc, exc_info=True)
+        abort(422, description=f"Editable PowerPoint export failed: {str(exc)[:220]}")
+    return send_file(
+        result,
+        as_attachment=True,
+        download_name=slugify(filename) + ".pptx",
+        mimetype=PPTX_MIMETYPE,
+    )
+
+
+@app.route("/export-pptx", methods=["POST"])
+def export_canvas_pptx():
+    """Export the current, possibly unsaved, canvas diagram."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        abort(400, description="Expected JSON with Mermaid source.")
+    source = payload.get("source", "")
+    filename = payload.get("filename", "diagram")
+    if not isinstance(source, str) or not isinstance(filename, str):
+        abort(400, description="Mermaid source and filename must be text.")
+    return send_editable_pptx(source, filename)
+
+
+@app.route("/repository/pptx/<path:diagram_id>")
+def export_repository_pptx(diagram_id):
+    """Export the assembled saved repository revision."""
+    diagram = load_repository_diagram(*diagram_id.split("/", 2))
+    source = renderable_repository_content(diagram)
+    return send_editable_pptx(source, f"{diagram.project_slug}_{diagram.name}_r{diagram.revision}")
 
 
 @app.route("/repository/export/<path:diagram_id>")

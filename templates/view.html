@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom/dist/svg-pan-zoom.min.js"></script>
+    <script src="{{ url_for('static', filename='diagram_export.js') }}"></script>
     <style>
         html, body { height: 100%; margin: 0; overflow: hidden; }
         .diagram-stage { height: calc(100vh - 57px); background: #fbfcfe; overflow: hidden; }
@@ -17,6 +18,11 @@
     <header class="navbar navbar-dark bg-dark px-3">
         <span class="navbar-brand mb-0 h1 text-truncate">Viewing {{ filename }}</span>
         <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm" id="download-svg" type="button" disabled>Export SVG</button>
+            <button class="btn btn-success btn-sm" id="download-png" type="button" disabled>Export PNG</button>
+            {% if diagram_id is defined %}
+                <a class="btn btn-success btn-sm" href="{{ url_for('export_repository_pptx', diagram_id=diagram_id) }}">Export editable PPTX</a>
+            {% endif %}
             {% if diagram_id is defined %}
                 <a class="btn btn-outline-light btn-sm" href="{{ url_for('edit_file', diagram_id=diagram_id) }}">Edit in Canvas</a>
             {% endif %}
@@ -27,6 +33,7 @@
         <div id="diagram-container"></div>
     </main>
     <script>
+        let exportSvg = null;
         const diagramText = {{ content | tojson }};
         mermaid.initialize({ startOnLoad: false, theme: {{ mermaid_theme | tojson }}, maxTextSize: {{ mermaid_view_max_text_size | tojson }} });
 
@@ -35,6 +42,9 @@
             try {
                 const { svg } = await mermaid.render('mermaid-svg-element', diagramText);
                 container.innerHTML = svg;
+                exportSvg = svg;
+                document.getElementById("download-svg").disabled = false;
+                document.getElementById("download-png").disabled = false;
                 const svgElement = container.querySelector('svg');
                 svgElement.style.width = '100%';
                 svgElement.style.height = '100%';
@@ -48,8 +58,24 @@
                     maxZoom: 15
                 });
             } catch (error) {
+                exportSvg = null;
+                document.getElementById("download-svg").disabled = true;
+                document.getElementById("download-png").disabled = true;
                 container.innerHTML = `<div class="alert alert-danger m-4"><strong>Render error</strong><br>${error.message}</div>`;
             }
+        }
+        for (const format of ['svg', 'png']) {
+            const button = document.getElementById('download-' + format);
+            button.addEventListener('click', async () => {
+                button.disabled = true;
+                try {
+                    await DiagramExport.download(exportSvg, format, {{ filename | tojson }});
+                } catch (error) {
+                    window.alert('Diagram export failed: ' + error.message);
+                } finally {
+                    button.disabled = !exportSvg;
+                }
+            });
         }
         renderDiagram();
     </script>
