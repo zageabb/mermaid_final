@@ -48,7 +48,11 @@ def test_unsaved_canvas_powerpoint_export_has_editable_shapes():
     assert 'Internal_Supplier_Access.pptx' in response.headers["Content-Disposition"]
     deck = Presentation(io.BytesIO(response.data))
     assert len(deck.slides) == 1
-    assert len(deck.slides[0].shapes) >= 2
+    assert len(deck.slides[0].shapes) >= 2, [
+        (str(shape.shape_type), shape.name, getattr(shape, "text", ""),
+         len(shape.shapes) if hasattr(shape, "shapes") else 0)
+        for shape in deck.slides[0].shapes
+    ]
 
 
 def test_saved_repository_powerpoint_download_uses_assembled_source():
