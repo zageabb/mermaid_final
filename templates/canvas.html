@@ -7,8 +7,6 @@
         <h1 class="h5 mb-0 text-truncate" id="activeWorkspaceTitle">{{ current_name }}</h1>
     </div>
     <div class="d-flex flex-wrap toolbar">
-        <button class="btn btn-outline-success btn-sm" type="button" id="download-svg" disabled>Export SVG</button>
-        <button class="btn btn-outline-success btn-sm" type="button" id="download-png" disabled>Export PNG</button>
         <select class="form-select form-select-sm" id="diagramTypeSelect" style="width: 190px;" aria-label="Diagram type">
             <option value="flowchart">Flowchart</option>
             <option value="sequence">Sequence</option>
@@ -67,7 +65,18 @@
         <section class="preview-pane d-flex flex-column">
             <div class="px-3 py-2 bg-white border-bottom d-flex justify-content-between align-items-center">
                 <strong class="small">Preview</strong>
-                <span class="small text-muted" id="renderState">Ready</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small text-muted" id="renderState">Ready</span>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-success btn-sm dropdown-toggle" type="button"
+                                id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Export rendered diagram" disabled>Export</button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
+                            <li><button class="dropdown-item" type="button" id="download-svg" disabled>SVG (vector)</button></li>
+                            <li><button class="dropdown-item" type="button" id="download-png" disabled>PNG (image)</button></li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             <div class="preview-surface">
                 <div class="btn-group btn-group-sm preview-tools" role="group" aria-label="Preview zoom controls">
@@ -325,6 +334,7 @@ async function renderDiagram() {
   exportSvg = null;
   document.getElementById("download-svg").disabled = true;
   document.getElementById("download-png").disabled = true;
+  document.getElementById("exportDropdown").disabled = true;
   clearTimeout(renderTimer);
   renderTimer = setTimeout(async () => {
     updateHelp();
@@ -338,6 +348,7 @@ async function renderDiagram() {
       exportSvg = svg;
       document.getElementById("download-svg").disabled = false;
       document.getElementById("download-png").disabled = false;
+      document.getElementById("exportDropdown").disabled = false;
       const svgElement = preview.querySelector('svg');
       if (svgElement) {
         svgElement.style.maxWidth = 'none';
