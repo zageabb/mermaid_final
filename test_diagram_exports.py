@@ -1,9 +1,10 @@
+"""Regression checks for SVG, PNG and editable native PowerPoint export."""
 import io
-from unittest.mock import patch
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from pptx import Presentation
-"""Regression checks for SVG, PNG and native editable PowerPoint export."""
+
 from app import app
 
 
@@ -37,7 +38,7 @@ def test_canvas_asset_url_with_uda_prefix():
 def test_unsaved_canvas_powerpoint_export_has_editable_shapes():
     client = app.test_client()
     response = client.post("/export-pptx", json={
-        "source": "flowchart TD\\n    A[Start] --> B[Done]",
+        "source": "flowchart TD\n    A[Start] --> B[Done]",
         "filename": "Internal Supplier Access",
     })
     assert response.status_code == 200, response.get_data(as_text=True)[:500]
@@ -53,10 +54,12 @@ def test_unsaved_canvas_powerpoint_export_has_editable_shapes():
 def test_saved_repository_powerpoint_download_uses_assembled_source():
     diagram = SimpleNamespace(
         project_slug="General", name="Test Flow", revision=1,
-        diagram_type="master", content="flowchart TD\\n A --> B",
+        diagram_type="master", content="flowchart TD\n A --> B",
     )
-    with patch("app.load_repository_diagram", return_value=diagram), \\
-         patch("app.renderable_repository_content", return_value="flowchart TD\\n A --> B") as assembled:
+    with (
+        patch("app.load_repository_diagram", return_value=diagram),
+        patch("app.renderable_repository_content", return_value="flowchart TD\n A --> B") as assembled,
+    ):
         response = app.test_client().get("/repository/pptx/General/test/1")
     assert response.status_code == 200
     assembled.assert_called_once_with(diagram)
