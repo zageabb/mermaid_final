@@ -3,11 +3,13 @@ on:
   pull_request:
     paths:
       - 'app.py'
+      - 'templates/repository.html'
       - 'tests/test_diagram_core_export.py'
       - '.github/workflows/diagram-core-integration.yml'
   push:
     paths:
       - 'app.py'
+      - 'templates/repository.html'
       - 'tests/test_diagram_core_export.py'
       - '.github/workflows/diagram-core-integration.yml'
 jobs:
