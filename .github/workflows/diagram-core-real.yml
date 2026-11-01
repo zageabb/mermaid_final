@@ -1,0 +1,38 @@
+name: Real diagram-core compatibility
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app.py'
+      - 'tests/test_real_diagram_core.py'
+      - '.github/workflows/diagram-core-real.yml'
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require authorised read-only access to shared source
+        env:
+          SHARED_TOKEN: ${{ secrets.SHARED_CAPABILITIES_READ_TOKEN }}
+        run: |
+          if [ -z "$SHARED_TOKEN" ]; then
+            echo "::error::Configure SHARED_CAPABILITIES_READ_TOKEN for real-package integration tests."
+            exit 1
+          fi
+      - name: Checkout exact shared package revision
+        uses: actions/checkout@v4
+        with:
+          repository: zageabb/shared-capabilities
+          ref: 434a6759d0c8e71d169d05948a0367707e53ba00
+          path: _shared_capabilities
+          persist-credentials: false
+          token: ${{ secrets.SHARED_CAPABILITIES_READ_TOKEN }}
+      - name: Install actual library and integration requirements
+        run: |
+          python -m pip install -r requirements.txt pytest
+          python -m pip install -e './_shared_capabilities/packages/diagram-core[pptx]'
+      - name: Execute actual package integration
+        run: python -m pytest tests/test_real_diagram_core.py -q
