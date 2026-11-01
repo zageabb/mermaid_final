@@ -76,3 +76,27 @@ def test_original_mmd_export_remains_available(client, monkeypatch):
     assert response.mimetype == "text/plain"
     assert response.data.decode("utf-8") == diagram.content
     assert response.headers["Content-Disposition"].endswith(".mmd")
+
+
+def test_repository_hides_pptx_action_by_default(client, monkeypatch):
+    monkeypatch.delenv("MERMAID_PPTX_EXPERIMENTAL", raising=False)
+    with patch.object(mermaid_app, "load_projects", return_value=[]):
+        response = client.get("/repository")
+    assert response.status_code == 200
+    assert b"Export PPTX" not in response.data
+
+
+def test_repository_shows_pptx_action_when_enabled(client, monkeypatch):
+    monkeypatch.setenv("MERMAID_PPTX_EXPERIMENTAL", "1")
+    diagram = types.SimpleNamespace(
+        id="demo/diagram/1", name="Diagram", revision=1, diagram_type="master"
+    )
+    project = types.SimpleNamespace(
+        name="Demo", description="", id="demo",
+        active_diagrams=[diagram], inactive_diagrams=[]
+    )
+    with patch.object(mermaid_app, "load_projects", return_value=[project]):
+        response = client.get("/repository")
+    assert response.status_code == 200
+    assert b"Export PPTX" in response.data
+    assert b"Export .mmd" in response.data
