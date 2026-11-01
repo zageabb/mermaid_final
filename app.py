@@ -552,7 +552,7 @@ def delete_saved_diagram(diagram_id):
 
 @app.route("/repository")
 def repository():
-    return render_template("repository.html", projects=load_projects())
+    return render_template("repository.html", projects=load_projects(), pptx_enabled=os.environ.get("MERMAID_PPTX_EXPERIMENTAL") == "1")
 
 
 @app.route("/repository/project", methods=["POST"])
