@@ -63,3 +63,16 @@ def test_valid_export_sends_pptx_attachment(client, monkeypatch):
     assert response.data == b"pptx-test-payload"
     assert "attachment" in response.headers["Content-Disposition"]
     assert "presentationml.presentation" in response.mimetype
+
+def test_original_mmd_export_remains_available(client, monkeypatch):
+    monkeypatch.delenv("MERMAID_PPTX_EXPERIMENTAL", raising=False)
+    diagram = types.SimpleNamespace(
+        diagram_type="standard", content="flowchart TD\nA --> B\n",
+        name="Original", project_slug="demo", revision=1,
+    )
+    with patch.object(mermaid_app, "load_repository_diagram", return_value=diagram):
+        response = client.get("/repository/export/demo/original/1")
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+    assert response.data.decode("utf-8") == diagram.content
+    assert response.headers["Content-Disposition"].endswith(".mmd")
