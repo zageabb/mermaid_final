@@ -810,6 +810,43 @@ def export_repository_diagram(diagram_id):
     )
 
 
+@app.route("/repository/export-pptx/<path:diagram_id>")
+def export_repository_pptx(diagram_id):
+    """Opt-in native PPTX export; never changes the existing .mmd route."""
+    if os.environ.get("MERMAID_PPTX_EXPERIMENTAL") != "1":
+        abort(404)
+    try:
+        from shared_diagram_core.pptx_export import export_flowchart_pptx
+        from shared_diagram_core import DiagramError
+    except ImportError:
+        return jsonify({"error": "Experimental diagram-core package is not installed."}), 503
+
+    parts = diagram_id.split("/", 2)
+    if len(parts) != 3:
+        abort(404)
+    diagram = load_repository_diagram(*parts)
+    source = assemble_repository_diagram(diagram) if diagram.diagram_type == "master" else diagram.content
+    from io import BytesIO
+    from tempfile import TemporaryDirectory
+    from flask import send_file
+
+    try:
+        with TemporaryDirectory(prefix="mermaid-pptx-") as directory:
+            output = Path(directory) / "diagram.pptx"
+            export_flowchart_pptx(source, output, title=diagram.name)
+            payload = output.read_bytes()
+    except DiagramError as exc:
+        return jsonify({"error": "Unsupported diagram for editable PowerPoint export.", "detail": str(exc)}), 422
+
+    filename = slugify(f"{diagram.project_slug}_{diagram.name}_r{diagram.revision}") + ".pptx"
+    return send_file(
+        BytesIO(payload),
+        mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
 if __name__ == "__main__":
     seed_file_repository_from_legacy_files()
     app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG)
