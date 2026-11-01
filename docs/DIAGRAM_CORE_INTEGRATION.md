@@ -13,14 +13,14 @@ This branch adds an optional endpoint alongside the existing /repository/export/
 - Unsupported Mermaid constructs return 422, with no silent bitmap fallback.
 - Missing optional package returns 503.
 - The original Mermaid editor, AI panel, repository storage and .mmd route are unchanged.
-- A visual export button has not yet been added.
+- A gated Export PPTX button is now present in active and revision-history repository rows; it appears only when MERMAID_PPTX_EXPERIMENTAL=1. Existing Export .mmd remains available.
 
 ## Acceptance gates
 1. CI and integration regression tests, including default disabled mode and error handling.
 2. Confirm the diagram-core export produces editable PowerPoint shapes with a representative diagram corpus.
 3. Review the existing repository export permissions and UDA authentication boundaries.
 4. Release/tag shared package and pin exact version here before enabling in deployment.
-5. Update user manual when the UI entry point is added.
+5. Confirm UI tests, update user manual and include clear limitations about supported flowcharts before enabling the flag.
 
 ## Rollback
 Unset MERMAID_PPTX_EXPERIMENTAL and restart the service; the additional endpoint becomes unavailable. No user data migrations are involved.
