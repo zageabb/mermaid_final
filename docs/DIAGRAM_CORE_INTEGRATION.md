@@ -24,3 +24,11 @@ This branch adds an optional endpoint alongside the existing /repository/export/
 
 ## Rollback
 Unset MERMAID_PPTX_EXPERIMENTAL and restart the service; the additional endpoint becomes unavailable. No user data migrations are involved.
+
+## Real-library CI gate
+
+The separate `Real diagram-core compatibility` workflow installs shared-capabilities at the immutable commit `434a6759d0c8e71d169d05948a0367707e53ba00`, then runs `tests/test_real_diagram_core.py` with actual PowerPoint shape assertions.
+
+For a private repository, configure `SHARED_CAPABILITIES_READ_TOKEN` as a GitHub Actions repository secret. Use a fine-grained token with **read-only Contents** access to `zageabb/shared-capabilities`; never add the token to source or workflow logs. If the secret is not present, the workflow fails explicitly rather than reporting a misleading compatibility success. Replace the pinned commit with a released semver tag or immutable released SHA after the package release is approved.
+
+The older isolated integration workflow uses stubs and is not a substitute for this real-library compatibility gate. Do not merge, deploy or enable the experimental endpoint until both workflows pass and release/access control review is completed.
