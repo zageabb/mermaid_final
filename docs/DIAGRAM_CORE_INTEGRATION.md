@@ -32,3 +32,13 @@ The separate `Real diagram-core compatibility` workflow installs shared-capabili
 For a private repository, configure `SHARED_CAPABILITIES_READ_TOKEN` as a GitHub Actions repository secret. Use a fine-grained token with **read-only Contents** access to `zageabb/shared-capabilities`; never add the token to source or workflow logs. If the secret is not present, the workflow fails explicitly rather than reporting a misleading compatibility success. Replace the pinned commit with a released semver tag or immutable released SHA after the package release is approved.
 
 The older isolated integration workflow uses stubs and is not a substitute for this real-library compatibility gate. Do not merge, deploy or enable the experimental endpoint until both workflows pass and release/access control review is completed.
+
+## Export implementation collision (review before merge)
+
+A separate existing Mermaid Final PR, [#1](https://github.com/zageabb/mermaid_final/pull/1), already provides an export UI and native editable PPTX using `diagram-pptx` (plus SVG/PNG exports). Its claimed support covers flowchart, sequence, class, ER and state diagrams, compared with this shared adapter's basic flowcharts.
+
+**Integration decision required**: avoid merging overlapping export routes/buttons from both PRs. Compare rendering fidelity and maintenance/security of both libraries. Prefer maintaining the established UX and using `diagram-core` as shared parsing/state APIs or as an opt-in exporter adapter only where proven equivalent. Do not remove the fuller renderer merely to consolidate packages.
+
+Shared compatibility CI now checks commit `e8ab27f8883144d02e62bb98f4beda6f334df161` of diagram-core, including atomic PPTX writes; this is still an **unreleased commit**, not a stable package version. It must be replaced with a pinned release only after licensing and API review.
+
+Acceptance must include no loss of existing preview SVG/PNG/PPTX, unsaved-edit exports, nested INCLUDE handling, reverse-proxy paths or Mermaid diagram-type coverage.
