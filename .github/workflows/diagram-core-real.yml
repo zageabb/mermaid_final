@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: zageabb/shared-capabilities
-          ref: 434a6759d0c8e71d169d05948a0367707e53ba00
+          ref: e8ab27f8883144d02e62bb98f4beda6f334df161
           path: _shared_capabilities
           persist-credentials: false
           token: ${{ secrets.SHARED_CAPABILITIES_READ_TOKEN }}
